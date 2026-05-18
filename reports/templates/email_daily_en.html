@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Daily SQL Health Report</title>
+</head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:0;background:#f8fafc;">
+<div style="max-width:700px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:24px 32px;color:white;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;">&#9989; Daily SQL Health Report</h1>
+        <p style="margin:8px 0 0;opacity:0.8;font-size:13px;">PROD-SQL-01 | 2025-01-15</p>
+    </div>
+
+    <!-- Status Banner -->
+    <div style="background:#059669;padding:12px 32px;color:white;font-weight:600;font-size:14px;">
+        All Systems Healthy
+    </div>
+
+    <!-- Summary Cards -->
+    <div style="padding:24px 32px;">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <tr>
+                <!-- CPU -->
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">CPU</div>
+                    <div style="font-size:24px;font-weight:700;color:#059669;">23%</div>
+                    <div style="font-size:10px;color:#94a3b8;">max: 45%</div>
+                </td>
+                <!-- PLE -->
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">PLE</div>
+                    <div style="font-size:24px;font-weight:700;color:#059669;">4521s</div>
+                    <div style="font-size:10px;color:#94a3b8;">min: 2100s</div>
+                </td>
+                <!-- Disk -->
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">DISK</div>
+                    <div style="font-size:24px;font-weight:700;color:#059669;">72%</div>
+                    <div style="font-size:10px;color:#94a3b8;">max used</div>
+                </td>
+                <!-- AG -->
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">AG LAG</div>
+                    <div style="font-size:24px;font-weight:700;color:#059669;">2s</div>
+                    <div style="font-size:10px;color:#94a3b8;">max lag</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Top Waits -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Top Waits (24h)</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Wait Type</th>
+                <th style="padding:8px;text-align:right;">Total (ms)</th>
+                <th style="padding:8px;text-align:right;">Delta (ms)</th>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;">CXPACKET</td>
+                <td style="padding:6px 8px;text-align:right;">1,245,320</td>
+                <td style="padding:6px 8px;text-align:right;">45,210</td>
+            </tr>
+            <tr style="background:#f8fafc;">
+                <td style="padding:6px 8px;">SOS_SCHEDULER_YIELD</td>
+                <td style="padding:6px 8px;text-align:right;">892,100</td>
+                <td style="padding:6px 8px;text-align:right;">12,450</td>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;">PAGEIOLATCH_SH</td>
+                <td style="padding:6px 8px;text-align:right;">456,780</td>
+                <td style="padding:6px 8px;text-align:right;">8,920</td>
+            </tr>
+            <tr style="background:#f8fafc;">
+                <td style="padding:6px 8px;">WRITELOG</td>
+                <td style="padding:6px 8px;text-align:right;">234,560</td>
+                <td style="padding:6px 8px;text-align:right;">5,670</td>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;">ASYNC_NETWORK_IO</td>
+                <td style="padding:6px 8px;text-align:right;">123,450</td>
+                <td style="padding:6px 8px;text-align:right;">3,210</td>
+            </tr>
+        </table>
+
+        <!-- Backup Status -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Backup Status</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Database</th>
+                <th style="padding:8px;text-align:center;">Full</th>
+                <th style="padding:8px;text-align:center;">Diff</th>
+                <th style="padding:8px;text-align:center;">Log</th>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;">ProductionDB</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 6h</td>
+                <td style="padding:6px 8px;text-align:center;">2h</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 0h</td>
+            </tr>
+            <tr style="background:#f8fafc;">
+                <td style="padding:6px 8px;">ReportingDB</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 8h</td>
+                <td style="padding:6px 8px;text-align:center;">4h</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 0h</td>
+            </tr>
+            <tr>
+                <td style="padding:6px 8px;">ArchiveDB</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 12h</td>
+                <td style="padding:6px 8px;text-align:center;">-</td>
+                <td style="padding:6px 8px;text-align:center;">&#9989; 0h</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f1f5f9;padding:16px 32px;font-size:11px;color:#64748b;text-align:center;">
+        SQL Health Monitor | PROD-SQL-01 | Generated: 2025-01-15 07:00:03 UTC
+    </div>
+
+</div>
+</body>
+</html>
