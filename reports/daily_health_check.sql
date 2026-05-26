@@ -1,81 +1,104 @@
 /*
     SQL Health Monitor - Daily Health Report Generator
-    Generates HTML email with daily health summary.
+    Aggregates last 24h of collector data into structured result sets.
     
-    Sends via Database Mail with traffic light indicators.
+    Calls:
+        - vw_CurrentHealth for traffic light status
+        - Recommendations engine for action items
+        - Baseline anomaly detection for deviations
+    
+    Output sections:
+        1. Executive Summary (overall health score + status)
+        2. Health Score (per-metric traffic light)
+        3. Top Issues (blocking, failed jobs, errors)
+        4. Anomalies vs Baseline
+        5. Recommendations (prioritized action items)
+    
+    Schema: [monitor]
     Compatibility: SQL Server 2016+
+    Author: Lucas Allan Borges
+    
+    Parameters:
+        @OverrideLanguage    CHAR(5)       - Override language (default: from Settings)
+        @OverrideRecipients  NVARCHAR(500) - Override email recipients
+        @DebugMode           BIT           - 1 = SELECT results instead of sending email
+    
+    Example Usage:
+        -- Generate and send daily report
+        EXEC [monitor].[usp_GenerateDailyReport];
+        
+        -- Debug mode - view structured output
+        EXEC [monitor].[usp_GenerateDailyReport] @DebugMode = 1;
+        
+        -- Override language
+        EXEC [monitor].[usp_GenerateDailyReport] @OverrideLanguage = 'ptbr', @DebugMode = 1;
 */
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_Report_DailyHealth]
+USE [DBA_Monitor];
+GO
+
+CREATE OR ALTER PROCEDURE [monitor].[usp_GenerateDailyReport]
     @OverrideLanguage CHAR(5) = NULL,
     @OverrideRecipients NVARCHAR(500) = NULL,
-    @DebugMode BIT = 0  -- 1 = SELECT HTML instead of sending email
+    @DebugMode BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
-    -- Get configuration
+    -- ============================================================
+    -- CONFIGURATION
+    -- ============================================================
     DECLARE @Language CHAR(5) = ISNULL(@OverrideLanguage, 
         (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'Language'));
-    DECLARE @Recipients NVARCHAR(500) = ISNULL(@OverrideRecipients,
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'Recipients'));
-    DECLARE @CcRecipients NVARCHAR(500) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'CcRecipients');
-    DECLARE @ProfileName NVARCHAR(128) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'ProfileName');
-    DECLARE @SubjectPrefix NVARCHAR(50) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'SubjectPrefix');
-    DECLARE @ServerName NVARCHAR(128) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'ServerName');
+    SET @Language = ISNULL(@Language, 'en');
 
-    -- Helper function for language strings
-    DECLARE @Title NVARCHAR(200) = (SELECT StringValue FROM [monitor].[Languages] WHERE LanguageCode = @Language AND StringKey = 'report.daily.title');
-    
+    DECLARE @ServerName NVARCHAR(128) = ISNULL(
+        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'ServerName'),
+        @@SERVERNAME);
+
     -- Date range: last 24 hours
     DECLARE @StartDate DATETIME2 = DATEADD(HOUR, -24, SYSUTCDATETIME());
     DECLARE @EndDate DATETIME2 = SYSUTCDATETIME();
     DECLARE @DateStr NVARCHAR(20) = FORMAT(SYSUTCDATETIME(), 'yyyy-MM-dd');
 
-    -- Collect metrics for summary
+    -- ============================================================
+    -- RESULT SET 1: EXECUTIVE SUMMARY
+    -- ============================================================
     DECLARE @CpuAvg INT, @CpuMax INT, @CpuStatus NVARCHAR(10);
     DECLARE @PleMin INT, @PleAvg INT, @MemStatus NVARCHAR(10);
     DECLARE @DiskMaxPct DECIMAL(5,2), @DiskStatus NVARCHAR(10);
     DECLARE @AgMaxLag INT, @AgStatus NVARCHAR(10);
-    DECLARE @BlockingCount INT;
-    DECLARE @FailedJobs INT;
-    DECLARE @ErrorCount INT;
+    DECLARE @BlockingCount INT, @FailedJobs INT, @ErrorCount INT;
     DECLARE @OverallStatus NVARCHAR(10);
+    DECLARE @HealthScore INT;
 
-    -- CPU Summary
+    -- CPU
     SELECT @CpuAvg = AVG(SqlCpuPct), @CpuMax = MAX(SqlCpuPct)
     FROM [monitor].[CpuHistory] WHERE CollectedAt >= @StartDate;
     SET @CpuStatus = CASE WHEN @CpuMax >= 95 THEN 'critical' WHEN @CpuMax >= 80 THEN 'warning' ELSE 'healthy' END;
 
-    -- Memory Summary
+    -- Memory (PLE)
     SELECT @PleMin = MIN(PageLifeExpectancy), @PleAvg = AVG(PageLifeExpectancy)
     FROM [monitor].[MemoryHistory] WHERE CollectedAt >= @StartDate;
     SET @MemStatus = CASE WHEN @PleMin <= 100 THEN 'critical' WHEN @PleMin <= 300 THEN 'warning' ELSE 'healthy' END;
 
-    -- Disk Summary
+    -- Disk
     SELECT @DiskMaxPct = MAX(UsedPct)
     FROM [monitor].[DiskHistory] WHERE CollectedAt >= @StartDate;
     SET @DiskStatus = CASE WHEN @DiskMaxPct >= 95 THEN 'critical' WHEN @DiskMaxPct >= 85 THEN 'warning' ELSE 'healthy' END;
 
-    -- AG Summary
+    -- AG
     SELECT @AgMaxLag = MAX(SecondsBehindPrimary)
     FROM [monitor].[AgHealthHistory] WHERE CollectedAt >= @StartDate;
     SET @AgStatus = CASE WHEN @AgMaxLag >= 120 THEN 'critical' WHEN @AgMaxLag >= 30 THEN 'warning' ELSE 'healthy' END;
 
-    -- Blocking count
+    -- Issues
     SELECT @BlockingCount = COUNT(*) FROM [monitor].[BlockingHistory] WHERE DetectedAt >= @StartDate;
-
-    -- Failed jobs
     SELECT @FailedJobs = COUNT(DISTINCT JobName) FROM [monitor].[JobHistory] 
-    WHERE CollectedAt >= @StartDate AND LastRunStatus = 'Failed';
-
-    -- Error count
+        WHERE CollectedAt >= @StartDate AND LastRunStatus = 'Failed';
     SELECT @ErrorCount = COUNT(*) FROM [monitor].[ErrorLogHistory] 
-    WHERE CollectedAt >= @StartDate AND Severity IN ('Critical', 'Error');
+        WHERE CollectedAt >= @StartDate AND Severity IN ('Critical', 'Error');
 
     -- Overall status
     SET @OverallStatus = CASE 
@@ -83,176 +106,236 @@ BEGIN
         WHEN @CpuStatus = 'warning' OR @MemStatus = 'warning' OR @DiskStatus = 'warning' OR @AgStatus = 'warning' THEN 'warning'
         ELSE 'healthy' END;
 
-    -- Build HTML
-    DECLARE @HTML NVARCHAR(MAX) = '';
-    DECLARE @StatusEmoji NVARCHAR(10) = CASE @OverallStatus 
-        WHEN 'healthy' THEN '&#9989;' WHEN 'warning' THEN '&#9888;' ELSE '&#128308;' END;
-    DECLARE @StatusColor NVARCHAR(10) = CASE @OverallStatus 
-        WHEN 'healthy' THEN '#059669' WHEN 'warning' THEN '#d97706' ELSE '#dc2626' END;
+    -- Health Score (0-100, higher is better)
+    SET @HealthScore = 100
+        - CASE @CpuStatus WHEN 'critical' THEN 25 WHEN 'warning' THEN 10 ELSE 0 END
+        - CASE @MemStatus WHEN 'critical' THEN 25 WHEN 'warning' THEN 10 ELSE 0 END
+        - CASE @DiskStatus WHEN 'critical' THEN 20 WHEN 'warning' THEN 8 ELSE 0 END
+        - CASE @AgStatus WHEN 'critical' THEN 20 WHEN 'warning' THEN 8 ELSE 0 END
+        - CASE WHEN @BlockingCount > 50 THEN 10 WHEN @BlockingCount > 10 THEN 5 ELSE 0 END
+        - CASE WHEN @FailedJobs > 5 THEN 10 WHEN @FailedJobs > 0 THEN 3 ELSE 0 END;
+    IF @HealthScore < 0 SET @HealthScore = 0;
 
-    SET @HTML = @HTML + '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:0;background:#f8fafc;">';
-    SET @HTML = @HTML + '<div style="max-width:700px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
-    
-    -- Header
-    SET @HTML = @HTML + '<div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:24px 32px;color:white;">';
-    SET @HTML = @HTML + '<h1 style="margin:0;font-size:22px;font-weight:700;">' + @StatusEmoji + ' ' + @Title + '</h1>';
-    SET @HTML = @HTML + '<p style="margin:8px 0 0;opacity:0.8;font-size:13px;">' + @ServerName + ' | ' + @DateStr + '</p>';
-    SET @HTML = @HTML + '</div>';
+    -- Output Result Set 1: Executive Summary
+    SELECT 
+        @ServerName AS ServerName,
+        @DateStr AS ReportDate,
+        @OverallStatus AS OverallStatus,
+        @HealthScore AS HealthScore,
+        @CpuAvg AS CpuAvg,
+        @CpuMax AS CpuMax,
+        @CpuStatus AS CpuStatus,
+        @PleAvg AS PleAvg,
+        @PleMin AS PleMin,
+        @MemStatus AS MemoryStatus,
+        @DiskMaxPct AS DiskMaxUsedPct,
+        @DiskStatus AS DiskStatus,
+        ISNULL(@AgMaxLag, 0) AS AgMaxLagSeconds,
+        @AgStatus AS AgStatus,
+        @BlockingCount AS BlockingEvents24h,
+        @FailedJobs AS FailedJobs24h,
+        @ErrorCount AS ErrorLogEntries24h;
 
-    -- Overall Status Banner
-    SET @HTML = @HTML + '<div style="background:' + @StatusColor + ';padding:12px 32px;color:white;font-weight:600;font-size:14px;">';
-    SET @HTML = @HTML + CASE @OverallStatus 
-        WHEN 'healthy' THEN CASE @Language WHEN 'ptbr' THEN 'Todos os sistemas saudáveis' ELSE 'All Systems Healthy' END
-        WHEN 'warning' THEN CASE @Language WHEN 'ptbr' THEN 'Atenção necessária em alguns itens' ELSE 'Attention Needed on Some Items' END
-        ELSE CASE @Language WHEN 'ptbr' THEN 'Problemas críticos detectados' ELSE 'Critical Issues Detected' END END;
-    SET @HTML = @HTML + '</div>';
+    -- ============================================================
+    -- RESULT SET 2: HEALTH SCORE BREAKDOWN (Traffic Light)
+    -- ============================================================
+    SELECT MetricName, MetricValue, Status, Details
+    FROM (
+        VALUES
+            ('CPU',      CAST(ISNULL(@CpuAvg, 0) AS NVARCHAR) + '% avg / ' + CAST(ISNULL(@CpuMax, 0) AS NVARCHAR) + '% max', @CpuStatus, 
+                CASE @CpuStatus WHEN 'critical' THEN 'CPU sustained above 95%' WHEN 'warning' THEN 'CPU peaked above 80%' ELSE 'Normal' END),
+            ('Memory',   CAST(ISNULL(@PleAvg, 0) AS NVARCHAR) + 's avg / ' + CAST(ISNULL(@PleMin, 0) AS NVARCHAR) + 's min PLE', @MemStatus,
+                CASE @MemStatus WHEN 'critical' THEN 'PLE dropped below 100s - severe memory pressure' WHEN 'warning' THEN 'PLE below 300s - memory pressure detected' ELSE 'Normal' END),
+            ('Disk',     CAST(ISNULL(CAST(@DiskMaxPct AS INT), 0) AS NVARCHAR) + '% max used', @DiskStatus,
+                CASE @DiskStatus WHEN 'critical' THEN 'Disk above 95% - immediate action needed' WHEN 'warning' THEN 'Disk above 85% - monitor closely' ELSE 'Normal' END),
+            ('AG Sync',  CAST(ISNULL(@AgMaxLag, 0) AS NVARCHAR) + 's max lag', @AgStatus,
+                CASE @AgStatus WHEN 'critical' THEN 'AG lag > 120s - potential data loss risk' WHEN 'warning' THEN 'AG lag > 30s - investigate' ELSE 'Normal' END),
+            ('Blocking', CAST(@BlockingCount AS NVARCHAR) + ' events', 
+                CASE WHEN @BlockingCount > 50 THEN 'critical' WHEN @BlockingCount > 10 THEN 'warning' ELSE 'healthy' END,
+                CASE WHEN @BlockingCount > 50 THEN 'Excessive blocking detected' WHEN @BlockingCount > 10 THEN 'Elevated blocking' ELSE 'Normal' END),
+            ('Jobs',     CAST(@FailedJobs AS NVARCHAR) + ' failed',
+                CASE WHEN @FailedJobs > 5 THEN 'critical' WHEN @FailedJobs > 0 THEN 'warning' ELSE 'healthy' END,
+                CASE WHEN @FailedJobs > 0 THEN CAST(@FailedJobs AS NVARCHAR) + ' job(s) failed in last 24h' ELSE 'All jobs healthy' END)
+    ) AS v(MetricName, MetricValue, Status, Details);
 
-    -- Summary Cards
-    SET @HTML = @HTML + '<div style="padding:24px 32px;">';
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">';
-    SET @HTML = @HTML + '<tr>';
+    -- ============================================================
+    -- RESULT SET 3: TOP ISSUES
+    -- ============================================================
     
-    -- CPU Card
-    SET @HTML = @HTML + '<td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">';
-    SET @HTML = @HTML + '<div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">' 
-        + CASE @Language WHEN 'ptbr' THEN 'CPU' ELSE 'CPU' END + '</div>';
-    SET @HTML = @HTML + '<div style="font-size:24px;font-weight:700;color:' 
-        + CASE @CpuStatus WHEN 'healthy' THEN '#059669' WHEN 'warning' THEN '#d97706' ELSE '#dc2626' END 
-        + ';">' + ISNULL(CAST(@CpuAvg AS NVARCHAR), 'N/A') + '%</div>';
-    SET @HTML = @HTML + '<div style="font-size:10px;color:#94a3b8;">max: ' + ISNULL(CAST(@CpuMax AS NVARCHAR), '-') + '%</div></td>';
-    
-    -- Memory Card
-    SET @HTML = @HTML + '<td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">';
-    SET @HTML = @HTML + '<div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">'
-        + CASE @Language WHEN 'ptbr' THEN 'PLE' ELSE 'PLE' END + '</div>';
-    SET @HTML = @HTML + '<div style="font-size:24px;font-weight:700;color:' 
-        + CASE @MemStatus WHEN 'healthy' THEN '#059669' WHEN 'warning' THEN '#d97706' ELSE '#dc2626' END 
-        + ';">' + ISNULL(CAST(@PleAvg AS NVARCHAR), 'N/A') + 's</div>';
-    SET @HTML = @HTML + '<div style="font-size:10px;color:#94a3b8;">min: ' + ISNULL(CAST(@PleMin AS NVARCHAR), '-') + 's</div></td>';
-    
-    -- Disk Card
-    SET @HTML = @HTML + '<td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">';
-    SET @HTML = @HTML + '<div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">'
-        + CASE @Language WHEN 'ptbr' THEN 'DISCO' ELSE 'DISK' END + '</div>';
-    SET @HTML = @HTML + '<div style="font-size:24px;font-weight:700;color:' 
-        + CASE @DiskStatus WHEN 'healthy' THEN '#059669' WHEN 'warning' THEN '#d97706' ELSE '#dc2626' END 
-        + ';">' + ISNULL(CAST(CAST(@DiskMaxPct AS INT) AS NVARCHAR), 'N/A') + '%</div>';
-    SET @HTML = @HTML + '<div style="font-size:10px;color:#94a3b8;">max used</div></td>';
-    
-    -- AG Card
-    SET @HTML = @HTML + '<td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:25%;">';
-    SET @HTML = @HTML + '<div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">AG LAG</div>';
-    SET @HTML = @HTML + '<div style="font-size:24px;font-weight:700;color:' 
-        + CASE @AgStatus WHEN 'healthy' THEN '#059669' WHEN 'warning' THEN '#d97706' ELSE '#dc2626' END 
-        + ';">' + ISNULL(CAST(@AgMaxLag AS NVARCHAR), '0') + 's</div>';
-    SET @HTML = @HTML + '<div style="font-size:10px;color:#94a3b8;">max lag</div></td>';
-    SET @HTML = @HTML + '</tr></table>';
+    -- Top blocking events
+    SELECT TOP 10
+        'Blocking' AS IssueType,
+        DetectedAt,
+        DatabaseName,
+        BlockingSpid,
+        BlockedSpid,
+        BlockingDurationSec,
+        LEFT(ISNULL(BlockingQuery, ''), 200) AS BlockingQuery,
+        LEFT(ISNULL(BlockedQuery, ''), 200) AS BlockedQuery
+    FROM [monitor].[BlockingHistory]
+    WHERE DetectedAt >= @StartDate
+    ORDER BY BlockingDurationSec DESC;
 
-    -- Issues Section
-    IF @BlockingCount > 0 OR @FailedJobs > 0 OR @ErrorCount > 0
+    -- Failed jobs detail
+    SELECT TOP 10
+        'FailedJob' AS IssueType,
+        CollectedAt,
+        JobName,
+        LastRunDate,
+        LastRunStatus,
+        LastRunDuration
+    FROM [monitor].[JobHistory]
+    WHERE CollectedAt >= @StartDate AND LastRunStatus = 'Failed'
+    ORDER BY LastRunDate DESC;
+
+    -- Critical/Error log entries
+    SELECT TOP 20
+        'ErrorLog' AS IssueType,
+        LogDate,
+        Severity,
+        ProcessInfo,
+        LEFT(ErrorMessage, 300) AS ErrorMessage
+    FROM [monitor].[ErrorLogHistory]
+    WHERE CollectedAt >= @StartDate AND Severity IN ('Critical', 'Error')
+    ORDER BY LogDate DESC;
+
+    -- ============================================================
+    -- RESULT SET 4: ANOMALIES VS BASELINE
+    -- ============================================================
+    IF OBJECT_ID('monitor.BaselineCapture', 'U') IS NOT NULL
+        AND EXISTS (SELECT 1 FROM [monitor].[BaselineCapture] WHERE IsActive = 1)
     BEGIN
-        SET @HTML = @HTML + '<h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">'
-            + CASE @Language WHEN 'ptbr' THEN 'Problemas Detectados' ELSE 'Issues Detected' END + '</h2>';
-        SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
-        
-        IF @BlockingCount > 0
-            SET @HTML = @HTML + '<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9;">&#128308; '
-                + CASE @Language WHEN 'ptbr' THEN 'Bloqueios' ELSE 'Blocking Events' END 
-                + '</td><td style="padding:8px;border-bottom:1px solid #f1f5f9;font-weight:700;">' + CAST(@BlockingCount AS NVARCHAR) + '</td></tr>';
-        
-        IF @FailedJobs > 0
-            SET @HTML = @HTML + '<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9;">&#9888; '
-                + CASE @Language WHEN 'ptbr' THEN 'Jobs com Falha' ELSE 'Failed Jobs' END 
-                + '</td><td style="padding:8px;border-bottom:1px solid #f1f5f9;font-weight:700;">' + CAST(@FailedJobs AS NVARCHAR) + '</td></tr>';
-        
-        IF @ErrorCount > 0
-            SET @HTML = @HTML + '<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9;">&#9888; '
-                + CASE @Language WHEN 'ptbr' THEN 'Erros no Log' ELSE 'Error Log Entries' END 
-                + '</td><td style="padding:8px;border-bottom:1px solid #f1f5f9;font-weight:700;">' + CAST(@ErrorCount AS NVARCHAR) + '</td></tr>';
-        
-        SET @HTML = @HTML + '</table>';
-    END;
-
-    -- Top Waits Section
-    SET @HTML = @HTML + '<h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">'
-        + CASE @Language WHEN 'ptbr' THEN 'Top Waits (24h)' ELSE 'Top Waits (24h)' END + '</h2>';
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
-    SET @HTML = @HTML + '<tr style="background:#0f172a;color:white;"><th style="padding:8px;text-align:left;">Wait Type</th><th style="padding:8px;text-align:right;">Total (ms)</th><th style="padding:8px;text-align:right;">Delta (ms)</th></tr>';
-    
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY DeltaWaitTimeMs DESC) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;">' + WaitType + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(WaitTimeMs, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + ISNULL(FORMAT(DeltaWaitTimeMs, 'N0'), '-') + '</td></tr>'
-    FROM (
-        SELECT TOP 5 WaitType, SUM(WaitTimeMs) AS WaitTimeMs, SUM(DeltaWaitTimeMs) AS DeltaWaitTimeMs
-        FROM [monitor].[WaitStatsHistory]
-        WHERE CollectedAt >= @StartDate
-        GROUP BY WaitType
-        ORDER BY SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) DESC
-    ) w;
-    SET @HTML = @HTML + '</table>';
-
-    -- Backup Status Section
-    SET @HTML = @HTML + '<h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">'
-        + CASE @Language WHEN 'ptbr' THEN 'Status de Backup' ELSE 'Backup Status' END + '</h2>';
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
-    SET @HTML = @HTML + '<tr style="background:#0f172a;color:white;"><th style="padding:8px;text-align:left;">'
-        + CASE @Language WHEN 'ptbr' THEN 'Banco' ELSE 'Database' END 
-        + '</th><th style="padding:8px;text-align:center;">Full</th><th style="padding:8px;text-align:center;">Diff</th><th style="padding:8px;text-align:center;">Log</th></tr>';
-    
-    SELECT @HTML = @HTML + '<tr><td style="padding:6px 8px;">' + DatabaseName + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;">' 
-        + CASE WHEN FullHours IS NULL THEN '&#128308; Never'
-               WHEN FullHours > 48 THEN '&#128308; ' + CAST(FullHours AS NVARCHAR) + 'h'
-               WHEN FullHours > 25 THEN '&#9888; ' + CAST(FullHours AS NVARCHAR) + 'h'
-               ELSE '&#9989; ' + CAST(FullHours AS NVARCHAR) + 'h' END + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;">' + ISNULL(CAST(DiffHours AS NVARCHAR) + 'h', '-') + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;">' 
-        + CASE WHEN LogHours IS NULL THEN '-'
-               WHEN LogHours > 4 THEN '&#128308; ' + CAST(LogHours AS NVARCHAR) + 'h'
-               WHEN LogHours > 1 THEN '&#9888; ' + CAST(LogHours AS NVARCHAR) + 'h'
-               ELSE '&#9989; ' + CAST(LogHours AS NVARCHAR) + 'h' END + '</td></tr>'
-    FROM (
+        -- Run anomaly detection for last 60 minutes and return results
         SELECT 
-            b.DatabaseName,
-            MAX(CASE WHEN b.BackupType = 'D' THEN b.HoursSinceLastBackup END) AS FullHours,
-            MAX(CASE WHEN b.BackupType = 'I' THEN b.HoursSinceLastBackup END) AS DiffHours,
-            MAX(CASE WHEN b.BackupType = 'L' THEN b.HoursSinceLastBackup END) AS LogHours
-        FROM [monitor].[BackupHistory] b
-        WHERE b.CollectedAt = (SELECT MAX(CollectedAt) FROM [monitor].[BackupHistory])
-        GROUP BY b.DatabaseName
-    ) bk;
-    SET @HTML = @HTML + '</table>';
-
-    -- Footer
-    SET @HTML = @HTML + '</div>';  -- Close padding div
-    SET @HTML = @HTML + '<div style="background:#f1f5f9;padding:16px 32px;font-size:11px;color:#64748b;text-align:center;">';
-    SET @HTML = @HTML + 'SQL Health Monitor | ' + @ServerName + ' | Generated: ' + FORMAT(SYSUTCDATETIME(), 'yyyy-MM-dd HH:mm:ss') + ' UTC';
-    SET @HTML = @HTML + '</div>';
-    SET @HTML = @HTML + '</div></body></html>';
-
-    -- Send or debug
-    IF @DebugMode = 1
+            ba.MetricName,
+            ba.CurrentValue,
+            ba.BaselineAvg,
+            ba.BaselineStdDev,
+            ba.DeviationMultiplier,
+            ba.Severity,
+            ba.Direction,
+            ba.Message
+        FROM [monitor].[BaselineAnomalies] ba
+        WHERE ba.DetectedAt >= @StartDate
+        ORDER BY 
+            CASE ba.Severity WHEN 'Critical' THEN 1 WHEN 'Warning' THEN 2 ELSE 3 END,
+            ba.DeviationMultiplier DESC;
+    END
+    ELSE
     BEGIN
-        SELECT @HTML AS HtmlReport;
-        RETURN;
+        -- Return empty result set with schema
+        SELECT 
+            CAST(NULL AS NVARCHAR(100)) AS MetricName,
+            CAST(NULL AS DECIMAL(18,4)) AS CurrentValue,
+            CAST(NULL AS DECIMAL(18,4)) AS BaselineAvg,
+            CAST(NULL AS DECIMAL(18,4)) AS BaselineStdDev,
+            CAST(NULL AS DECIMAL(8,2)) AS DeviationMultiplier,
+            CAST(NULL AS NVARCHAR(20)) AS Severity,
+            CAST(NULL AS NVARCHAR(10)) AS Direction,
+            CAST(NULL AS NVARCHAR(500)) AS Message
+        WHERE 1 = 0;
     END;
 
-    -- Send email
-    DECLARE @Subject NVARCHAR(200) = @SubjectPrefix + ' ' + 
-        CASE @OverallStatus WHEN 'healthy' THEN '&#9989;' WHEN 'warning' THEN '&#9888;' ELSE '&#128308;' END
-        + ' ' + @Title + ' - ' + @DateStr;
+    -- ============================================================
+    -- RESULT SET 5: RECOMMENDATIONS
+    -- ============================================================
+    DECLARE @Recommendations TABLE (
+        Priority    INT,
+        Category    NVARCHAR(50),
+        Message     NVARCHAR(500),
+        ActionItem  NVARCHAR(500)
+    );
 
-    EXEC msdb.dbo.sp_send_dbmail
-        @profile_name = @ProfileName,
-        @recipients = @Recipients,
-        @copy_recipients = @CcRecipients,
-        @subject = @Subject,
-        @body = @HTML,
-        @body_format = 'HTML';
+    -- P1: Critical disk
+    IF @DiskMaxPct >= 95
+        INSERT INTO @Recommendations VALUES (1, 'Disk', 
+            'Disk usage at ' + CAST(CAST(@DiskMaxPct AS INT) AS NVARCHAR) + '%. Immediate action required.',
+            'Free disk space, extend volume, or archive old data.');
 
-    -- Log report
-    INSERT INTO [monitor].[ReportHistory] (ReportType, Recipients, Language, Success)
-    VALUES ('Daily', @Recipients, @Language, 1);
+    -- P1: Critical memory
+    IF @PleMin <= 100
+        INSERT INTO @Recommendations VALUES (1, 'Memory',
+            'PLE dropped to ' + CAST(@PleMin AS NVARCHAR) + 's. Severe memory pressure.',
+            'Identify memory-intensive queries. Consider adding RAM or optimizing workload.');
+
+    -- P1: AG critical lag
+    IF ISNULL(@AgMaxLag, 0) >= 120
+        INSERT INTO @Recommendations VALUES (1, 'AG',
+            'AG replication lag reached ' + CAST(@AgMaxLag AS NVARCHAR) + 's. Data loss risk.',
+            'Check network, redo queue, and secondary replica health.');
+
+    -- P2: Warning-level issues
+    IF @CpuMax >= 80
+        INSERT INTO @Recommendations VALUES (2, 'CPU',
+            'CPU peaked at ' + CAST(@CpuMax AS NVARCHAR) + '%. Investigate top queries.',
+            'Review top CPU consumers in TopQueriesHistory. Consider query tuning or index optimization.');
+
+    IF @DiskMaxPct >= 85 AND @DiskMaxPct < 95
+        INSERT INTO @Recommendations VALUES (2, 'Disk',
+            'Disk usage at ' + CAST(CAST(@DiskMaxPct AS INT) AS NVARCHAR) + '%. Plan capacity expansion.',
+            'Project growth rate and schedule disk expansion before reaching 95%.');
+
+    IF @BlockingCount > 10
+        INSERT INTO @Recommendations VALUES (2, 'Blocking',
+            CAST(@BlockingCount AS NVARCHAR) + ' blocking events in 24h.',
+            'Review blocking queries. Consider RCSI or query optimization.');
+
+    IF @FailedJobs > 0
+        INSERT INTO @Recommendations VALUES (2, 'Jobs',
+            CAST(@FailedJobs AS NVARCHAR) + ' SQL Agent job(s) failed.',
+            'Check job history for error details. Fix and re-run failed jobs.');
+
+    -- P3: Informational
+    IF @ErrorCount > 50
+        INSERT INTO @Recommendations VALUES (3, 'ErrorLog',
+            CAST(@ErrorCount AS NVARCHAR) + ' error entries in 24h. Elevated error rate.',
+            'Review error log patterns. May indicate underlying issue.');
+
+    -- Add baseline anomaly recommendations
+    IF OBJECT_ID('monitor.BaselineAnomalies', 'U') IS NOT NULL
+    BEGIN
+        INSERT INTO @Recommendations (Priority, Category, Message, ActionItem)
+        SELECT DISTINCT
+            CASE Severity WHEN 'Critical' THEN 1 ELSE 2 END,
+            'Baseline',
+            MetricName + ' deviating ' + CAST(CAST(DeviationMultiplier AS DECIMAL(5,1)) AS NVARCHAR) 
+                + 'σ from baseline (' + Severity + ')',
+            'Investigate root cause. Current: ' + CAST(CAST(CurrentValue AS DECIMAL(10,2)) AS NVARCHAR)
+                + ' vs Baseline: ' + CAST(CAST(BaselineAvg AS DECIMAL(10,2)) AS NVARCHAR)
+        FROM [monitor].[BaselineAnomalies]
+        WHERE DetectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())
+            AND Acknowledged = 0;
+    END;
+
+    SELECT Priority, Category, Message, ActionItem
+    FROM @Recommendations
+    ORDER BY Priority, Category;
+
+    -- ============================================================
+    -- TOP WAITS (bonus result set for PowerShell consumption)
+    -- ============================================================
+    SELECT TOP 10
+        WaitType,
+        SUM(WaitTimeMs) AS TotalWaitMs,
+        SUM(ISNULL(DeltaWaitTimeMs, 0)) AS TotalDeltaMs,
+        SUM(WaitingTasksCount) AS TotalWaitingTasks
+    FROM [monitor].[WaitStatsHistory]
+    WHERE CollectedAt >= @StartDate
+    GROUP BY WaitType
+    ORDER BY SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) DESC;
+
+    -- ============================================================
+    -- LOG REPORT GENERATION
+    -- ============================================================
+    IF @DebugMode = 0
+    BEGIN
+        INSERT INTO [monitor].[ReportHistory] (ReportType, Recipients, Language, Success)
+        VALUES ('Daily', ISNULL(@OverrideRecipients, 'PowerShell'), @Language, 1);
+    END;
+
+    PRINT '✓ Daily report generated. Health Score: ' + CAST(@HealthScore AS NVARCHAR) + '/100 (' + @OverallStatus + ')';
 END;
+GO
+
+PRINT '✓ Procedure [monitor].[usp_GenerateDailyReport] created.';
 GO

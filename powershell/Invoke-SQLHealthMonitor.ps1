@@ -7,8 +7,12 @@
     Connects to the SQLHealthMonitor database and runs T-SQL collectors in proper sequence,
     evaluates alert thresholds, and optionally generates/sends health reports.
 
+    Supports multi-instance mode via -AllInstances switch, which reads from the
+    RegisteredServers table and loops collection across all active instances.
+
 .PARAMETER ServerInstance
     SQL Server instance name (e.g., 'SERVER\INSTANCE' or 'server,port').
+    Not required when using -AllInstances.
 
 .PARAMETER Database
     Monitor database name. Default: 'SQLHealthMonitor'.
@@ -25,6 +29,17 @@
 .PARAMETER ConfigPath
     Path to JSON config file. Default: module's config/default.json.
 
+.PARAMETER AllInstances
+    When specified, reads from [monitor].[RegisteredServers] and runs the
+    specified RunType against all active instances. Requires a CMS server
+    specified via -ServerInstance (the instance hosting the RegisteredServers table).
+
+.PARAMETER Environment
+    Filter instances by environment when using -AllInstances (DEV, STG, PRD).
+
+.PARAMETER ParallelDegree
+    Max parallel instance collections when using -AllInstances. Default: 4.
+
 .EXAMPLE
     Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection
 
@@ -34,16 +49,24 @@
 .EXAMPLE
     Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Alert -Verbose
 
+.EXAMPLE
+    # Multi-instance: collect from all registered production servers
+    Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances -Environment PRD
+
+.EXAMPLE
+    # Multi-instance: collect from ALL registered servers
+    Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances
+
 .NOTES
     Author: Lucas Allan Borges
-    Version: 1.0.0
+    Version: 2.0.0
     Requires: dbatools module, SQL Server 2016+
 #>
 
 function Invoke-SQLHealthMonitor {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
+        [Parameter(Mandatory = $false, Position = 0, ValueFromPipeline = $true)]
         [ValidateNotNullOrEmpty()]
         [string]$ServerInstance,
 
@@ -65,10 +88,26 @@ function Invoke-SQLHealthMonitor {
 
         [Parameter()]
         [ValidateScript({ Test-Path $_ -PathType Leaf })]
-        [string]$ConfigPath
+        [string]$ConfigPath,
+
+        [Parameter()]
+        [switch]$AllInstances,
+
+        [Parameter()]
+        [ValidateSet('DEV', 'STG', 'PRD', 'DR')]
+        [string]$Environment,
+
+        [Parameter()]
+        [ValidateRange(1, 16)]
+        [int]$ParallelDegree = 4
     )
 
     begin {
+        # --- Validate parameters ---
+        if (-not $AllInstances -and -not $ServerInstance) {
+            throw "ServerInstance is required unless -AllInstances is specified."
+        }
+
         # --- Initialize logging ---
         $scriptStart = Get-Date
         $modulePath = Split-Path -Parent $PSScriptRoot
@@ -111,11 +150,164 @@ function Invoke-SQLHealthMonitor {
         }
 
         Write-Log "=== SQL Health Monitor started ==="
-        Write-Log "ServerInstance: $ServerInstance | Database: $Database | RunType: $RunType | Language: $Language"
+        Write-Log "RunType: $RunType | Language: $Language | AllInstances: $AllInstances"
     }
 
     process {
         try {
+            # ============================================================
+            # MULTI-INSTANCE MODE
+            # ============================================================
+            if ($AllInstances) {
+                if (-not $ServerInstance) {
+                    throw "ServerInstance (CMS host) is required with -AllInstances to read RegisteredServers."
+                }
+
+                Write-Log "Multi-instance mode: connecting to CMS host $ServerInstance..."
+                $cmsInstance = Connect-DbaInstance -SqlInstance $ServerInstance -Database $Database
+
+                # Read registered servers
+                $envFilter = if ($Environment) { "AND Environment = '$Environment'" } else { "" }
+                $registeredQuery = @"
+SELECT InstanceName, MonitorDatabase, Environment, AgRole, ServerRole
+FROM [monitor].[RegisteredServers]
+WHERE IsActive = 1 $envFilter
+ORDER BY Environment, InstanceName
+"@
+                $registeredServers = Invoke-DbaQuery -SqlInstance $cmsInstance -Database $Database -Query $registeredQuery
+
+                if (-not $registeredServers -or $registeredServers.Count -eq 0) {
+                    Write-Log "No active registered servers found matching criteria." -Level Warning
+                    return
+                }
+
+                Write-Log "Found $($registeredServers.Count) registered instance(s). Starting $RunType..."
+
+                # Track results
+                $results = [System.Collections.ArrayList]::new()
+
+                # Process instances (sequential or parallel based on PS version)
+                foreach ($server in $registeredServers) {
+                    $instanceName = $server.InstanceName
+                    $instanceDb = $server.MonitorDatabase
+                    $instanceStart = Get-Date
+
+                    Write-Log "Processing [$instanceName] ($($server.Environment) / $($server.ServerRole))..."
+
+                    try {
+                        if ($PSCmdlet.ShouldProcess($instanceName, "$RunType")) {
+                            $instanceConn = Connect-DbaInstance -SqlInstance $instanceName -Database $instanceDb
+
+                            switch ($RunType) {
+                                'Collection' {
+                                    Invoke-HealthCollection -SqlInstance $instanceConn -Database $instanceDb -Config $config
+                                    
+                                    # Also collect health snapshot for CMS comparison
+                                    $snapshotQuery = @"
+INSERT INTO [$Database].[monitor].[InstanceHealthSnapshot]
+    (InstanceName, HealthScore, CpuAvg, CpuMax, PleAvg, DiskMaxUsedPct, AgMaxLagSec, BlockingCount, AlertCount, OverallStatus)
+SELECT 
+    '$instanceName',
+    100 
+        - CASE WHEN MAX(c.SqlCpuPct) >= 95 THEN 25 WHEN MAX(c.SqlCpuPct) >= 80 THEN 10 ELSE 0 END
+        - CASE WHEN MIN(m.PageLifeExpectancy) <= 100 THEN 25 WHEN MIN(m.PageLifeExpectancy) <= 300 THEN 10 ELSE 0 END
+        - CASE WHEN MAX(d.UsedPct) >= 95 THEN 20 WHEN MAX(d.UsedPct) >= 85 THEN 8 ELSE 0 END,
+    AVG(c.SqlCpuPct), MAX(c.SqlCpuPct),
+    AVG(m.PageLifeExpectancy),
+    MAX(d.UsedPct),
+    ISNULL(MAX(ag.SecondsBehindPrimary), 0),
+    (SELECT COUNT(*) FROM [monitor].[BlockingHistory] WHERE DetectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())),
+    (SELECT COUNT(*) FROM [monitor].[AlertHistory] WHERE FiredAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())),
+    CASE 
+        WHEN MAX(c.SqlCpuPct) >= 95 OR MIN(m.PageLifeExpectancy) <= 100 OR MAX(d.UsedPct) >= 95 THEN 'critical'
+        WHEN MAX(c.SqlCpuPct) >= 80 OR MIN(m.PageLifeExpectancy) <= 300 OR MAX(d.UsedPct) >= 85 THEN 'warning'
+        ELSE 'healthy'
+    END
+FROM [monitor].[CpuHistory] c
+CROSS JOIN [monitor].[MemoryHistory] m
+CROSS JOIN [monitor].[DiskHistory] d
+LEFT JOIN [monitor].[AgHealthHistory] ag ON ag.CollectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())
+WHERE c.CollectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())
+    AND m.CollectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME())
+    AND d.CollectedAt >= DATEADD(HOUR, -1, SYSUTCDATETIME());
+"@
+                                    # Run snapshot on remote, insert into CMS
+                                    try {
+                                        Invoke-DbaQuery -SqlInstance $instanceConn -Database $instanceDb -Query $snapshotQuery -QueryTimeout 30
+                                    }
+                                    catch {
+                                        Write-Log "  Snapshot collection failed for [$instanceName]: $($_.Exception.Message)" -Level Warning
+                                    }
+                                }
+                                'DailyReport' {
+                                    Invoke-HealthCollection -SqlInstance $instanceConn -Database $instanceDb -Config $config
+                                    $reportData = Get-ReportData -SqlInstance $instanceConn -Database $instanceDb -ReportType 'Daily'
+                                    Send-HealthReport -ServerInstance $instanceName -Database $instanceDb `
+                                        -ReportType 'Daily' -Language $Language -ReportData $reportData -Config $config
+                                }
+                                'WeeklyReport' {
+                                    Invoke-HealthCollection -SqlInstance $instanceConn -Database $instanceDb -Config $config
+                                    $reportData = Get-ReportData -SqlInstance $instanceConn -Database $instanceDb -ReportType 'Weekly'
+                                    Send-HealthReport -ServerInstance $instanceName -Database $instanceDb `
+                                        -ReportType 'Weekly' -Language $Language -ReportData $reportData -Config $config
+                                }
+                                'Alert' {
+                                    Invoke-HealthCollection -SqlInstance $instanceConn -Database $instanceDb -Config $config
+                                    $alerts = Invoke-AlertEvaluation -SqlInstance $instanceConn -Database $instanceDb
+                                    if ($alerts.Count -gt 0) {
+                                        Write-Log "  ALERT on [$instanceName]: $($alerts.Count) threshold(s) breached!"
+                                        Send-HealthReport -ServerInstance $instanceName -Database $instanceDb `
+                                            -ReportType 'Alert' -Language $Language -ReportData $alerts -Config $config
+                                    }
+                                }
+                            }
+
+                            $elapsed = ((Get-Date) - $instanceStart).TotalSeconds
+                            [void]$results.Add([PSCustomObject]@{
+                                Instance    = $instanceName
+                                Environment = $server.Environment
+                                Status      = 'Success'
+                                Duration    = [math]::Round($elapsed, 1)
+                                Error       = $null
+                            })
+
+                            # Update registration status
+                            $updateQuery = "UPDATE [monitor].[RegisteredServers] SET LastCollectedAt = SYSUTCDATETIME(), LastCollectionStatus = 'Success' WHERE InstanceName = '$instanceName'"
+                            Invoke-DbaQuery -SqlInstance $cmsInstance -Database $Database -Query $updateQuery -QueryTimeout 10
+                        }
+                    }
+                    catch {
+                        $elapsed = ((Get-Date) - $instanceStart).TotalSeconds
+                        Write-Log "  FAILED [$instanceName]: $($_.Exception.Message)" -Level Warning
+                        [void]$results.Add([PSCustomObject]@{
+                            Instance    = $instanceName
+                            Environment = $server.Environment
+                            Status      = 'Failed'
+                            Duration    = [math]::Round($elapsed, 1)
+                            Error       = $_.Exception.Message
+                        })
+
+                        # Update registration status
+                        $updateQuery = "UPDATE [monitor].[RegisteredServers] SET LastCollectedAt = SYSUTCDATETIME(), LastCollectionStatus = 'Failed' WHERE InstanceName = '$instanceName'"
+                        try { Invoke-DbaQuery -SqlInstance $cmsInstance -Database $Database -Query $updateQuery -QueryTimeout 10 } catch {}
+                    }
+                }
+
+                # Summary output
+                $successCount = ($results | Where-Object Status -eq 'Success').Count
+                $failCount = ($results | Where-Object Status -eq 'Failed').Count
+                Write-Log "Multi-instance $RunType complete: $successCount succeeded, $failCount failed."
+
+                # Output results
+                $results | Format-Table -AutoSize
+                return
+            }
+
+            # ============================================================
+            # SINGLE-INSTANCE MODE (original behavior)
+            # ============================================================
+            Write-Log "Single-instance mode: $ServerInstance | Database: $Database"
+
             # --- Establish connection ---
             Write-Log "Connecting to $ServerInstance..."
             if ($PSCmdlet.ShouldProcess($ServerInstance, "Connect to SQL Server")) {
@@ -277,6 +469,7 @@ function Get-ReportData {
     <#
     .SYNOPSIS
         Retrieves aggregated data for report generation.
+        Calls usp_GenerateDailyReport or usp_GenerateWeeklyReport for structured output.
     #>
     [CmdletBinding()]
     param(
@@ -285,9 +478,21 @@ function Get-ReportData {
         [Parameter(Mandatory)][ValidateSet('Daily', 'Weekly')][string]$ReportType
     )
 
-    # Use the current health view as base data
-    $viewQuery = "SELECT * FROM dbo.vw_CurrentHealth"
-    $currentHealth = Invoke-DbaQuery -SqlInstance $SqlInstance -Database $Database -Query $viewQuery
+    # Use the new structured report procedures
+    $reportProc = switch ($ReportType) {
+        'Daily'  { '[monitor].[usp_GenerateDailyReport] @DebugMode = 1' }
+        'Weekly' { '[monitor].[usp_GenerateWeeklyReport] @DebugMode = 1' }
+    }
+
+    try {
+        $reportData = Invoke-DbaQuery -SqlInstance $SqlInstance -Database $Database -Query "EXEC $reportProc" -QueryTimeout 300
+    }
+    catch {
+        Write-Log "Report procedure failed, falling back to view-based data: $($_.Exception.Message)" -Level Warning
+        # Fallback to basic view
+        $viewQuery = "SELECT * FROM [monitor].[vw_CurrentHealth]"
+        $reportData = Invoke-DbaQuery -SqlInstance $SqlInstance -Database $Database -Query $viewQuery
+    }
 
     # Get recommendations
     $recsPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'reports\recommendations_engine.sql'
@@ -298,28 +503,15 @@ function Get-ReportData {
     }
 
     # Build report data object
-    $reportData = [PSCustomObject]@{
+    $result = [PSCustomObject]@{
         ReportType      = $ReportType
         GeneratedAt     = Get-Date
         ServerInstance  = $SqlInstance.Name
-        CurrentHealth   = $currentHealth
+        ReportData      = $reportData
         Recommendations = $recommendations
     }
 
-    if ($ReportType -eq 'Weekly') {
-        # Weekly includes trend data
-        $trendQuery = @"
-SELECT MetricName, CollectedAt, MetricValue
-FROM dbo.HealthMetrics
-WHERE CollectedAt >= DATEADD(DAY, -7, GETDATE())
-ORDER BY MetricName, CollectedAt
-"@
-        $reportData | Add-Member -NotePropertyName 'TrendData' -NotePropertyValue (
-            Invoke-DbaQuery -SqlInstance $SqlInstance -Database $Database -Query $trendQuery
-        )
-    }
-
-    return $reportData
+    return $result
 }
 
 #endregion

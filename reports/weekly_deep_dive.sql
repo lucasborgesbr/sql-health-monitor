@@ -1,508 +1,464 @@
 /*
-    SQL Health Monitor - Weekly Deep Dive Report
-    Generates comprehensive HTML email with week-over-week analysis.
+    SQL Health Monitor - Weekly Deep Dive Report Generator
+    Aggregates 7 days of collector data into structured result sets.
     
-    Includes: growth trends, capacity planning, performance baselines,
-    top queries, index recommendations, AG history, and prioritized recommendations.
+    Includes:
+        - Week-over-week comparison for key metrics
+        - Capacity planning: growth projections (disk, database size, log usage)
+        - Top N degraded queries (this week vs last week)
+        - "What Changed This Week" (growth spikes, new errors, config drift)
+        - Anomalies vs Baseline summary
+        - Prioritized recommendations
     
-    Schedule: Monday 8:00 AM
+    Output structured for PowerShell Send-HealthReport consumption.
+    
+    Schema: [monitor]
     Compatibility: SQL Server 2016+
+    Author: Lucas Allan Borges
+    
+    Parameters:
+        @OverrideLanguage    CHAR(5)       - Override language (default: from Settings)
+        @OverrideRecipients  NVARCHAR(500) - Override email recipients
+        @DebugMode           BIT           - 1 = SELECT results instead of sending email
+    
+    Example Usage:
+        -- Generate and send weekly report
+        EXEC [monitor].[usp_GenerateWeeklyReport];
+        
+        -- Debug mode
+        EXEC [monitor].[usp_GenerateWeeklyReport] @DebugMode = 1;
+        
+        -- Portuguese output
+        EXEC [monitor].[usp_GenerateWeeklyReport] @OverrideLanguage = 'ptbr', @DebugMode = 1;
 */
 
 USE [DBA_Monitor];
 GO
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_Report_WeeklyDeepDive]
+CREATE OR ALTER PROCEDURE [monitor].[usp_GenerateWeeklyReport]
     @OverrideLanguage CHAR(5) = NULL,
     @OverrideRecipients NVARCHAR(500) = NULL,
     @DebugMode BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
-    -- Configuration
+    -- ============================================================
+    -- CONFIGURATION
+    -- ============================================================
     DECLARE @Language CHAR(5) = ISNULL(@OverrideLanguage, 
         (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'Language'));
-    DECLARE @Recipients NVARCHAR(500) = ISNULL(@OverrideRecipients,
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'Recipients'));
-    DECLARE @CcRecipients NVARCHAR(500) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'CcRecipients');
-    DECLARE @ProfileName NVARCHAR(128) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'ProfileName');
-    DECLARE @SubjectPrefix NVARCHAR(50) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'Email' AND SettingName = 'SubjectPrefix');
-    DECLARE @ServerName NVARCHAR(128) = 
-        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'ServerName');
+    SET @Language = ISNULL(@Language, 'en');
+
+    DECLARE @ServerName NVARCHAR(128) = ISNULL(
+        (SELECT SettingValue FROM [monitor].[Settings] WHERE Category = 'General' AND SettingName = 'ServerName'),
+        @@SERVERNAME);
 
     -- Date ranges
     DECLARE @ThisWeekStart DATETIME2 = DATEADD(DAY, -7, SYSUTCDATETIME());
     DECLARE @LastWeekStart DATETIME2 = DATEADD(DAY, -14, SYSUTCDATETIME());
     DECLARE @LastWeekEnd DATETIME2 = DATEADD(DAY, -7, SYSUTCDATETIME());
     DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-    DECLARE @WeekStr NVARCHAR(30) = FORMAT(@ThisWeekStart, 'MMM dd') + ' - ' + FORMAT(@Now, 'MMM dd, yyyy');
-
-    -- Language strings
-    DECLARE @Title NVARCHAR(200) = (SELECT StringValue FROM [monitor].[Languages] WHERE LanguageCode = @Language AND StringKey = 'report.weekly.title');
-    SET @Title = ISNULL(@Title, 'Weekly SQL Health Deep Dive');
+    DECLARE @WeekStr NVARCHAR(50) = FORMAT(@ThisWeekStart, 'MMM dd') + ' - ' + FORMAT(@Now, 'MMM dd, yyyy');
 
     -- ============================================================
-    -- COLLECT METRICS FOR COMPARISON
+    -- RESULT SET 1: WEEK-OVER-WEEK COMPARISON
     -- ============================================================
     DECLARE @CpuAvgThis INT, @CpuMaxThis INT, @CpuAvgLast INT, @CpuMaxLast INT;
+    DECLARE @PleAvgThis INT, @PleMinThis INT, @PleAvgLast INT, @PleMinLast INT;
+    DECLARE @BlockingThis INT, @BlockingLast INT;
+    DECLARE @AlertsThis INT, @AlertsLast INT;
+    DECLARE @ErrorsThis INT, @ErrorsLast INT;
+    DECLARE @FailedJobsThis INT, @FailedJobsLast INT;
+
     SELECT @CpuAvgThis = AVG(SqlCpuPct), @CpuMaxThis = MAX(SqlCpuPct)
     FROM [monitor].[CpuHistory] WHERE CollectedAt >= @ThisWeekStart;
     SELECT @CpuAvgLast = AVG(SqlCpuPct), @CpuMaxLast = MAX(SqlCpuPct)
     FROM [monitor].[CpuHistory] WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd;
 
-    DECLARE @PleAvgThis INT, @PleMinThis INT, @PleAvgLast INT, @PleMinLast INT;
     SELECT @PleAvgThis = AVG(PageLifeExpectancy), @PleMinThis = MIN(PageLifeExpectancy)
     FROM [monitor].[MemoryHistory] WHERE CollectedAt >= @ThisWeekStart;
     SELECT @PleAvgLast = AVG(PageLifeExpectancy), @PleMinLast = MIN(PageLifeExpectancy)
     FROM [monitor].[MemoryHistory] WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd;
 
-    DECLARE @BlockingThis INT, @BlockingLast INT;
     SELECT @BlockingThis = COUNT(*) FROM [monitor].[BlockingHistory] WHERE DetectedAt >= @ThisWeekStart;
     SELECT @BlockingLast = COUNT(*) FROM [monitor].[BlockingHistory] WHERE DetectedAt >= @LastWeekStart AND DetectedAt < @LastWeekEnd;
 
-    DECLARE @AlertsThis INT, @AlertsLast INT;
     SELECT @AlertsThis = COUNT(*) FROM [monitor].[AlertHistory] WHERE FiredAt >= @ThisWeekStart;
     SELECT @AlertsLast = COUNT(*) FROM [monitor].[AlertHistory] WHERE FiredAt >= @LastWeekStart AND FiredAt < @LastWeekEnd;
 
-    -- ============================================================
-    -- BUILD HTML
-    -- ============================================================
-    DECLARE @HTML NVARCHAR(MAX) = '';
+    SELECT @ErrorsThis = COUNT(*) FROM [monitor].[ErrorLogHistory] WHERE CollectedAt >= @ThisWeekStart AND Severity IN ('Critical', 'Error');
+    SELECT @ErrorsLast = COUNT(*) FROM [monitor].[ErrorLogHistory] WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd AND Severity IN ('Critical', 'Error');
 
-    -- HTML open + header
-    SET @HTML = '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
-        + '<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:0;background:#f8fafc;">'
-        + '<div style="max-width:800px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">'
-        + '<div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;color:white;">'
-        + '<h1 style="margin:0;font-size:24px;font-weight:700;">&#128202; ' + @Title + '</h1>'
-        + '<p style="margin:8px 0 0;opacity:0.8;font-size:13px;">' + @ServerName + ' | ' + @WeekStr + '</p>'
-        + '</div>';
+    SELECT @FailedJobsThis = COUNT(DISTINCT JobName) FROM [monitor].[JobHistory] WHERE CollectedAt >= @ThisWeekStart AND LastRunStatus = 'Failed';
+    SELECT @FailedJobsLast = COUNT(DISTINCT JobName) FROM [monitor].[JobHistory] WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd AND LastRunStatus = 'Failed';
 
-    -- SECTION 1: Executive Summary
-    SET @HTML = @HTML + '<div style="padding:24px 32px;">';
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128200; Resumo Semanal' ELSE '&#128200; Weekly Summary' END + '</h2>';
-
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:10px;text-align:left;">' + CASE @Language WHEN 'ptbr' THEN 'M&#233;trica' ELSE 'Metric' END + '</th>'
-        + '<th style="padding:10px;text-align:center;">' + CASE @Language WHEN 'ptbr' THEN 'Esta Semana' ELSE 'This Week' END + '</th>'
-        + '<th style="padding:10px;text-align:center;">' + CASE @Language WHEN 'ptbr' THEN 'Semana Anterior' ELSE 'Last Week' END + '</th>'
-        + '<th style="padding:10px;text-align:center;">' + CASE @Language WHEN 'ptbr' THEN 'Tend&#234;ncia' ELSE 'Trend' END + '</th></tr>';
-
-    -- CPU row
-    SET @HTML = @HTML + '<tr><td style="padding:8px;">CPU Avg</td>'
-        + '<td style="padding:8px;text-align:center;">' + ISNULL(CAST(@CpuAvgThis AS NVARCHAR), 'N/A') + '%</td>'
-        + '<td style="padding:8px;text-align:center;">' + ISNULL(CAST(@CpuAvgLast AS NVARCHAR), 'N/A') + '%</td>'
-        + '<td style="padding:8px;text-align:center;">' + CASE 
-            WHEN @CpuAvgThis > @CpuAvgLast THEN '&#128308; &#8593;'
-            WHEN @CpuAvgThis < @CpuAvgLast THEN '&#9989; &#8595;'
-            ELSE '&#9898; &#8596;' END + '</td></tr>';
-
-    -- PLE row
-    SET @HTML = @HTML + '<tr style="background:#f8fafc;"><td style="padding:8px;">PLE Avg</td>'
-        + '<td style="padding:8px;text-align:center;">' + ISNULL(CAST(@PleAvgThis AS NVARCHAR), 'N/A') + 's</td>'
-        + '<td style="padding:8px;text-align:center;">' + ISNULL(CAST(@PleAvgLast AS NVARCHAR), 'N/A') + 's</td>'
-        + '<td style="padding:8px;text-align:center;">' + CASE 
-            WHEN @PleAvgThis < @PleAvgLast THEN '&#128308; &#8595;'
-            WHEN @PleAvgThis > @PleAvgLast THEN '&#9989; &#8593;'
-            ELSE '&#9898; &#8596;' END + '</td></tr>';
-
-    -- Blocking row
-    SET @HTML = @HTML + '<tr><td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'Bloqueios' ELSE 'Blocking Events' END + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CAST(ISNULL(@BlockingThis, 0) AS NVARCHAR) + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CAST(ISNULL(@BlockingLast, 0) AS NVARCHAR) + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CASE 
-            WHEN @BlockingThis > @BlockingLast THEN '&#128308; &#8593;'
-            WHEN @BlockingThis < @BlockingLast THEN '&#9989; &#8595;'
-            ELSE '&#9898; &#8596;' END + '</td></tr>';
-
-    -- Alerts row
-    SET @HTML = @HTML + '<tr style="background:#f8fafc;"><td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'Alertas' ELSE 'Alerts Fired' END + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CAST(ISNULL(@AlertsThis, 0) AS NVARCHAR) + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CAST(ISNULL(@AlertsLast, 0) AS NVARCHAR) + '</td>'
-        + '<td style="padding:8px;text-align:center;">' + CASE 
-            WHEN @AlertsThis > @AlertsLast THEN '&#128308; &#8593;'
-            WHEN @AlertsThis < @AlertsLast THEN '&#9989; &#8595;'
-            ELSE '&#9898; &#8596;' END + '</td></tr>';
-
-    SET @HTML = @HTML + '</table>';
-
-    -- ============================================================
-    -- SECTION 2: Disk Growth & Capacity Planning
-    -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128190; Crescimento e Capacidade' ELSE '&#128190; Growth &amp; Capacity Planning' END + '</h2>';
-
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:8px;text-align:left;">Drive</th>'
-        + '<th style="padding:8px;text-align:right;">Total (GB)</th>'
-        + '<th style="padding:8px;text-align:right;">Used (%)</th>'
-        + '<th style="padding:8px;text-align:right;">Growth/Week</th>'
-        + '<th style="padding:8px;text-align:right;">Days to 95%</th></tr>';
-
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY d.DriveLetter) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;font-weight:600;">' + d.DriveLetter + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + CAST(CAST(d.TotalSpaceMB / 1024.0 AS DECIMAL(10,1)) AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;color:' 
-            + CASE WHEN d.UsedPct >= 95 THEN '#dc2626' WHEN d.UsedPct >= 85 THEN '#d97706' ELSE '#059669' END 
-            + ';">' + CAST(CAST(d.UsedPct AS DECIMAL(5,1)) AS NVARCHAR) + '%</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' 
-            + ISNULL(CAST(CAST(d.GrowthMB / 1024.0 AS DECIMAL(10,2)) AS NVARCHAR) + ' GB', '-') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;font-weight:600;color:' 
-            + CASE WHEN d.DaysTo95 <= 30 THEN '#dc2626' WHEN d.DaysTo95 <= 90 THEN '#d97706' ELSE '#059669' END 
-            + ';">' + CASE WHEN d.DaysTo95 IS NULL OR d.DaysTo95 > 9999 THEN '&#8734;' ELSE CAST(d.DaysTo95 AS NVARCHAR) END + '</td></tr>'
+    SELECT 
+        @ServerName AS ServerName,
+        @WeekStr AS ReportPeriod,
+        MetricName, ThisWeek, LastWeek,
+        CASE 
+            WHEN LastWeek = 0 AND ThisWeek = 0 THEN 'stable'
+            WHEN LastWeek = 0 THEN 'new'
+            WHEN ThisWeek > LastWeek THEN 'up'
+            WHEN ThisWeek < LastWeek THEN 'down'
+            ELSE 'stable'
+        END AS Trend,
+        CASE 
+            WHEN LastWeek = 0 THEN NULL
+            ELSE CAST(ROUND((CAST(ThisWeek - LastWeek AS DECIMAL(18,2)) / NULLIF(LastWeek, 0)) * 100, 1) AS DECIMAL(5,1))
+        END AS ChangePct
     FROM (
+        VALUES
+            ('CPU Avg %',       CAST(ISNULL(@CpuAvgThis, 0) AS DECIMAL(18,2)),  CAST(ISNULL(@CpuAvgLast, 0) AS DECIMAL(18,2))),
+            ('CPU Max %',       CAST(ISNULL(@CpuMaxThis, 0) AS DECIMAL(18,2)),  CAST(ISNULL(@CpuMaxLast, 0) AS DECIMAL(18,2))),
+            ('PLE Avg (s)',     CAST(ISNULL(@PleAvgThis, 0) AS DECIMAL(18,2)),  CAST(ISNULL(@PleAvgLast, 0) AS DECIMAL(18,2))),
+            ('PLE Min (s)',     CAST(ISNULL(@PleMinThis, 0) AS DECIMAL(18,2)),  CAST(ISNULL(@PleMinLast, 0) AS DECIMAL(18,2))),
+            ('Blocking Events', CAST(ISNULL(@BlockingThis, 0) AS DECIMAL(18,2)), CAST(ISNULL(@BlockingLast, 0) AS DECIMAL(18,2))),
+            ('Alerts Fired',    CAST(ISNULL(@AlertsThis, 0) AS DECIMAL(18,2)),  CAST(ISNULL(@AlertsLast, 0) AS DECIMAL(18,2))),
+            ('Error Log Entries', CAST(ISNULL(@ErrorsThis, 0) AS DECIMAL(18,2)), CAST(ISNULL(@ErrorsLast, 0) AS DECIMAL(18,2))),
+            ('Failed Jobs',     CAST(ISNULL(@FailedJobsThis, 0) AS DECIMAL(18,2)), CAST(ISNULL(@FailedJobsLast, 0) AS DECIMAL(18,2)))
+    ) AS v(MetricName, ThisWeek, LastWeek);
+
+    -- ============================================================
+    -- RESULT SET 2: CAPACITY PLANNING (Disk Growth Projections)
+    -- ============================================================
+    SELECT 
+        curr.DriveLetter,
+        CAST(curr.TotalSpaceMB / 1024.0 AS DECIMAL(10,1)) AS TotalGB,
+        CAST((curr.TotalSpaceMB - curr.FreeSpaceMB) / 1024.0 AS DECIMAL(10,1)) AS UsedGB,
+        CAST(curr.FreeSpaceMB / 1024.0 AS DECIMAL(10,1)) AS FreeGB,
+        CAST(curr.UsedPct AS DECIMAL(5,1)) AS UsedPct,
+        CAST(ISNULL(growth.WeeklyGrowthMB, 0) / 1024.0 AS DECIMAL(10,2)) AS WeeklyGrowthGB,
+        CAST(ISNULL(growth.WeeklyGrowthMB, 0) / 1024.0 * 4 AS DECIMAL(10,2)) AS ProjectedMonthlyGrowthGB,
+        CASE 
+            WHEN ISNULL(growth.DailyGrowthMB, 0) <= 0 THEN 9999
+            ELSE CAST((curr.FreeSpaceMB - (curr.TotalSpaceMB * 0.05)) / NULLIF(growth.DailyGrowthMB, 0) AS INT)
+        END AS DaysUntil95Pct,
+        CASE 
+            WHEN ISNULL(growth.DailyGrowthMB, 0) <= 0 THEN 'No growth'
+            WHEN (curr.FreeSpaceMB - (curr.TotalSpaceMB * 0.05)) / NULLIF(growth.DailyGrowthMB, 0) <= 30 THEN 'CRITICAL'
+            WHEN (curr.FreeSpaceMB - (curr.TotalSpaceMB * 0.05)) / NULLIF(growth.DailyGrowthMB, 0) <= 90 THEN 'WARNING'
+            ELSE 'OK'
+        END AS CapacityStatus
+    FROM (
+        -- Current disk state (latest collection)
+        SELECT DriveLetter, AVG(TotalSpaceMB) AS TotalSpaceMB, AVG(FreeSpaceMB) AS FreeSpaceMB, AVG(UsedPct) AS UsedPct
+        FROM [monitor].[DiskHistory]
+        WHERE CollectedAt >= DATEADD(HOUR, -6, @Now)
+        GROUP BY DriveLetter
+    ) curr
+    LEFT JOIN (
+        -- Growth calculation: difference between this week start and now
         SELECT 
-            curr.DriveLetter, curr.TotalSpaceMB, curr.UsedPct,
-            (curr.TotalSpaceMB - curr.FreeSpaceMB) - ISNULL((prev.TotalSpaceMB - prev.FreeSpaceMB), (curr.TotalSpaceMB - curr.FreeSpaceMB)) AS GrowthMB,
-            CASE 
-                WHEN ((curr.TotalSpaceMB - curr.FreeSpaceMB) - ISNULL((prev.TotalSpaceMB - prev.FreeSpaceMB), (curr.TotalSpaceMB - curr.FreeSpaceMB))) <= 0 THEN NULL
-                ELSE CAST(((curr.TotalSpaceMB * 0.95) - (curr.TotalSpaceMB - curr.FreeSpaceMB)) 
-                    / NULLIF(((curr.TotalSpaceMB - curr.FreeSpaceMB) - ISNULL((prev.TotalSpaceMB - prev.FreeSpaceMB), (curr.TotalSpaceMB - curr.FreeSpaceMB))) / 7.0, 0) AS INT)
-            END AS DaysTo95
+            n.DriveLetter,
+            (n.UsedMB - ISNULL(o.UsedMB, n.UsedMB)) AS WeeklyGrowthMB,
+            (n.UsedMB - ISNULL(o.UsedMB, n.UsedMB)) / 7.0 AS DailyGrowthMB
         FROM (
-            SELECT DriveLetter, AVG(TotalSpaceMB) AS TotalSpaceMB, AVG(FreeSpaceMB) AS FreeSpaceMB, AVG(UsedPct) AS UsedPct
-            FROM [monitor].[DiskHistory] WHERE CollectedAt >= DATEADD(HOUR, -6, SYSUTCDATETIME())
+            SELECT DriveLetter, AVG(TotalSpaceMB - FreeSpaceMB) AS UsedMB
+            FROM [monitor].[DiskHistory]
+            WHERE CollectedAt >= DATEADD(HOUR, -6, @Now)
             GROUP BY DriveLetter
-        ) curr
+        ) n
         LEFT JOIN (
-            SELECT DriveLetter, AVG(TotalSpaceMB) AS TotalSpaceMB, AVG(FreeSpaceMB) AS FreeSpaceMB
-            FROM [monitor].[DiskHistory] WHERE CollectedAt >= @LastWeekStart AND CollectedAt < DATEADD(HOUR, 6, @LastWeekStart)
+            SELECT DriveLetter, AVG(TotalSpaceMB - FreeSpaceMB) AS UsedMB
+            FROM [monitor].[DiskHistory]
+            WHERE CollectedAt >= @ThisWeekStart AND CollectedAt < DATEADD(HOUR, 6, @ThisWeekStart)
             GROUP BY DriveLetter
-        ) prev ON curr.DriveLetter = prev.DriveLetter
-    ) d;
+        ) o ON n.DriveLetter = o.DriveLetter
+    ) growth ON curr.DriveLetter = growth.DriveLetter
+    ORDER BY curr.UsedPct DESC;
 
-    SET @HTML = @HTML + '</table>';
-
-    -- ============================================================
-    -- SECTION 3: Database File Growth
-    -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128196; Crescimento de Arquivos' ELSE '&#128196; Database File Growth' END + '</h2>';
-
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:8px;text-align:left;">Database</th>'
-        + '<th style="padding:8px;text-align:left;">File</th>'
-        + '<th style="padding:8px;text-align:center;">Type</th>'
-        + '<th style="padding:8px;text-align:right;">Size (MB)</th>'
-        + '<th style="padding:8px;text-align:right;">Growth (MB)</th></tr>';
-
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY fg.DatabaseName, fg.FileName) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;">' + fg.DatabaseName + '</td>'
-        + '<td style="padding:6px 8px;">' + fg.FileName + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;">' + fg.FileType + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + CAST(fg.CurrentSizeMB AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;color:' + CASE WHEN fg.TotalGrowth > 0 THEN '#d97706' ELSE '#059669' END + ';">'
-        + CASE WHEN fg.TotalGrowth > 0 THEN '+' ELSE '' END + CAST(ISNULL(fg.TotalGrowth, 0) AS NVARCHAR) + '</td></tr>'
-    FROM (
-        SELECT TOP 15
-            f.DatabaseName, f.FileName, f.FileType,
-            MAX(f.SizeMB) AS CurrentSizeMB,
-            SUM(ISNULL(f.GrowthMB, 0)) AS TotalGrowth
-        FROM [monitor].[FileGrowthHistory] f
-        WHERE f.CollectedAt >= @ThisWeekStart
-        GROUP BY f.DatabaseName, f.FileName, f.FileType
-        ORDER BY SUM(ISNULL(f.GrowthMB, 0)) DESC
-    ) fg;
-
-    SET @HTML = @HTML + '</table>';
-
-    -- ============================================================
-    -- SECTION 4: Top 10 Queries of the Week
-    -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128269; Top 10 Queries da Semana' ELSE '&#128269; Top 10 Queries of the Week' END + '</h2>';
-
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:8px;text-align:center;">#</th>'
-        + '<th style="padding:8px;text-align:left;">Database</th>'
-        + '<th style="padding:8px;text-align:right;">CPU (ms)</th>'
-        + '<th style="padding:8px;text-align:right;">Reads</th>'
-        + '<th style="padding:8px;text-align:right;">Execs</th>'
-        + '<th style="padding:8px;text-align:right;">Avg Dur (ms)</th>'
-        + '<th style="padding:8px;text-align:left;">Query (truncated)</th></tr>';
-
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN q.RowNum % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;text-align:center;font-weight:600;">' + CAST(q.RowNum AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;">' + ISNULL(q.DatabaseName, '-') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(q.TotalCpuMs, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(q.TotalReads, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(q.ExecutionCount, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(q.AvgDurationMs, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;font-size:10px;">' + LEFT(ISNULL(REPLACE(REPLACE(q.QueryText, '<', '&lt;'), '>', '&gt;'), ''), 80) + '</td></tr>'
+    -- Database file growth projections
+    SELECT 
+        fg.DatabaseName,
+        fg.FileType,
+        SUM(fg.CurrentSizeMB) AS CurrentSizeMB,
+        SUM(fg.TotalGrowthMB) AS WeeklyGrowthMB,
+        SUM(fg.TotalGrowthMB) * 4 AS ProjectedMonthlyGrowthMB,
+        CASE 
+            WHEN SUM(fg.TotalGrowthMB) > 1024 THEN 'HIGH'
+            WHEN SUM(fg.TotalGrowthMB) > 256 THEN 'MODERATE'
+            ELSE 'LOW'
+        END AS GrowthRate
     FROM (
         SELECT 
-            ROW_NUMBER() OVER (ORDER BY SUM(TotalCpuMs) DESC) AS RowNum,
-            DatabaseName,
-            SUM(TotalCpuMs) AS TotalCpuMs,
-            SUM(TotalReads) AS TotalReads,
-            SUM(ExecutionCount) AS ExecutionCount,
-            AVG(AvgDurationMs) AS AvgDurationMs,
+            DatabaseName, FileType,
+            MAX(SizeMB) AS CurrentSizeMB,
+            SUM(ISNULL(GrowthMB, 0)) AS TotalGrowthMB
+        FROM [monitor].[FileGrowthHistory]
+        WHERE CollectedAt >= @ThisWeekStart
+        GROUP BY DatabaseName, FileName, FileType
+    ) fg
+    GROUP BY fg.DatabaseName, fg.FileType
+    HAVING SUM(fg.TotalGrowthMB) > 0
+    ORDER BY SUM(fg.TotalGrowthMB) DESC;
+
+    -- ============================================================
+    -- RESULT SET 3: TOP DEGRADED QUERIES (This Week vs Last Week)
+    -- ============================================================
+    SELECT TOP 15
+        tw.DatabaseName,
+        tw.QueryHash,
+        tw.TotalCpuMs AS CpuMs_ThisWeek,
+        ISNULL(lw.TotalCpuMs, 0) AS CpuMs_LastWeek,
+        CASE 
+            WHEN ISNULL(lw.TotalCpuMs, 0) = 0 THEN NULL
+            ELSE CAST(ROUND((CAST(tw.TotalCpuMs - ISNULL(lw.TotalCpuMs, 0) AS DECIMAL(18,2)) / NULLIF(lw.TotalCpuMs, 0)) * 100, 1) AS DECIMAL(10,1))
+        END AS CpuChangePct,
+        tw.TotalReads AS Reads_ThisWeek,
+        ISNULL(lw.TotalReads, 0) AS Reads_LastWeek,
+        tw.ExecutionCount AS Execs_ThisWeek,
+        ISNULL(lw.ExecutionCount, 0) AS Execs_LastWeek,
+        tw.AvgDurationMs AS AvgDurMs_ThisWeek,
+        ISNULL(lw.AvgDurationMs, 0) AS AvgDurMs_LastWeek,
+        LEFT(ISNULL(tw.QueryText, ''), 200) AS QueryText
+    FROM (
+        SELECT DatabaseName, QueryHash,
+            SUM(TotalCpuMs) AS TotalCpuMs, SUM(TotalReads) AS TotalReads,
+            SUM(ExecutionCount) AS ExecutionCount, AVG(AvgDurationMs) AS AvgDurationMs,
             MAX(QueryText) AS QueryText
         FROM [monitor].[TopQueriesHistory]
         WHERE CollectedAt >= @ThisWeekStart
         GROUP BY DatabaseName, QueryHash
-    ) q
-    WHERE q.RowNum <= 10;
-
-    SET @HTML = @HTML + '</table>';
+    ) tw
+    LEFT JOIN (
+        SELECT DatabaseName, QueryHash,
+            SUM(TotalCpuMs) AS TotalCpuMs, SUM(TotalReads) AS TotalReads,
+            SUM(ExecutionCount) AS ExecutionCount, AVG(AvgDurationMs) AS AvgDurationMs
+        FROM [monitor].[TopQueriesHistory]
+        WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd
+        GROUP BY DatabaseName, QueryHash
+    ) lw ON tw.DatabaseName = lw.DatabaseName AND tw.QueryHash = lw.QueryHash
+    WHERE tw.TotalCpuMs > ISNULL(lw.TotalCpuMs, 0)  -- Only degraded queries
+    ORDER BY (tw.TotalCpuMs - ISNULL(lw.TotalCpuMs, 0)) DESC;
 
     -- ============================================================
-    -- SECTION 5: Index Recommendations
+    -- RESULT SET 4: WHAT CHANGED THIS WEEK
     -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128736; Recomendações de Índice' ELSE '&#128736; Index Recommendations' END + '</h2>';
+    DECLARE @Changes TABLE (
+        ChangeType  NVARCHAR(50),
+        ChangeDate  DATETIME2,
+        Description NVARCHAR(500),
+        Impact      NVARCHAR(20)  -- HIGH, MEDIUM, LOW
+    );
 
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:8px;text-align:left;">Database.Table</th>'
-        + '<th style="padding:8px;text-align:left;">Index</th>'
-        + '<th style="padding:8px;text-align:center;">Frag %</th>'
-        + '<th style="padding:8px;text-align:right;">Pages</th>'
-        + '<th style="padding:8px;text-align:center;">' + CASE @Language WHEN 'ptbr' THEN 'Ação' ELSE 'Action' END + '</th></tr>';
-
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY ix.FragPct DESC) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;">' + ix.DatabaseName + '.' + ix.TableName + '</td>'
-        + '<td style="padding:6px 8px;">' + ISNULL(ix.IndexName, 'HEAP') + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;color:' 
-            + CASE WHEN ix.FragPct >= 30 THEN '#dc2626' ELSE '#d97706' END + ';font-weight:600;">'
-            + CAST(CAST(ix.FragPct AS DECIMAL(5,1)) AS NVARCHAR) + '%</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + FORMAT(ix.PageCount, 'N0') + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;font-weight:600;color:' 
-            + CASE WHEN ix.FragPct >= 30 THEN '#dc2626' ELSE '#d97706' END + ';">'
-            + CASE WHEN ix.FragPct >= 30 THEN 'REBUILD' ELSE 'REORGANIZE' END + '</td></tr>'
+    -- Disk growth spikes (any drive grew > 5GB in a day)
+    INSERT INTO @Changes (ChangeType, ChangeDate, Description, Impact)
+    SELECT 'Disk Growth Spike', CollectedAt, 
+        DriveLetter + ': grew ' + CAST(CAST(GrowthMB / 1024.0 AS DECIMAL(10,1)) AS NVARCHAR) + ' GB in one collection',
+        CASE WHEN GrowthMB > 10240 THEN 'HIGH' WHEN GrowthMB > 5120 THEN 'MEDIUM' ELSE 'LOW' END
     FROM (
-        SELECT TOP 20
-            DatabaseName, TableName, IndexName, 
-            MAX(FragmentationPct) AS FragPct,
-            MAX(PageCount) AS PageCount
-        FROM [monitor].[IndexHealthHistory]
+        SELECT DriveLetter, CollectedAt,
+            (TotalSpaceMB - FreeSpaceMB) - LAG(TotalSpaceMB - FreeSpaceMB) OVER (PARTITION BY DriveLetter ORDER BY CollectedAt) AS GrowthMB
+        FROM [monitor].[DiskHistory]
         WHERE CollectedAt >= @ThisWeekStart
-            AND FragmentationPct >= 10
-            AND PageCount >= 1000
-        GROUP BY DatabaseName, TableName, IndexName
-        ORDER BY MAX(FragmentationPct) DESC
-    ) ix;
+    ) d
+    WHERE GrowthMB > 5120;  -- > 5GB spike
 
-    SET @HTML = @HTML + '</table>';
+    -- Database file auto-growth events
+    INSERT INTO @Changes (ChangeType, ChangeDate, Description, Impact)
+    SELECT TOP 10 'File Auto-Growth', CollectedAt,
+        DatabaseName + '.' + FileName + ' (' + FileType + '): grew ' + CAST(GrowthMB AS NVARCHAR) + ' MB',
+        CASE WHEN GrowthMB > 1024 THEN 'HIGH' WHEN GrowthMB > 256 THEN 'MEDIUM' ELSE 'LOW' END
+    FROM [monitor].[FileGrowthHistory]
+    WHERE CollectedAt >= @ThisWeekStart AND ISNULL(GrowthMB, 0) > 100
+    ORDER BY GrowthMB DESC;
+
+    -- New error patterns (errors that didn't appear last week)
+    INSERT INTO @Changes (ChangeType, ChangeDate, Description, Impact)
+    SELECT TOP 5 'New Error Pattern', MIN(LogDate),
+        LEFT(ErrorMessage, 200) + ' (appeared ' + CAST(COUNT(*) AS NVARCHAR) + ' times)',
+        CASE WHEN COUNT(*) > 100 THEN 'HIGH' WHEN COUNT(*) > 10 THEN 'MEDIUM' ELSE 'LOW' END
+    FROM [monitor].[ErrorLogHistory] e
+    WHERE e.CollectedAt >= @ThisWeekStart
+        AND e.Severity IN ('Critical', 'Error')
+        AND NOT EXISTS (
+            SELECT 1 FROM [monitor].[ErrorLogHistory] prev
+            WHERE prev.CollectedAt >= @LastWeekStart AND prev.CollectedAt < @LastWeekEnd
+                AND prev.ErrorMessage = e.ErrorMessage
+        )
+    GROUP BY LEFT(ErrorMessage, 200)
+    HAVING COUNT(*) >= 3
+    ORDER BY COUNT(*) DESC;
+
+    -- AG state changes
+    INSERT INTO @Changes (ChangeType, ChangeDate, Description, Impact)
+    SELECT DISTINCT 'AG State Change', CollectedAt,
+        AgName + '/' + ReplicaServer + ': ' + SyncState + ' (' + SyncHealth + ')',
+        CASE WHEN SyncHealth <> 'HEALTHY' THEN 'HIGH' ELSE 'MEDIUM' END
+    FROM [monitor].[AgHealthHistory]
+    WHERE CollectedAt >= @ThisWeekStart
+        AND (SyncHealth <> 'HEALTHY' OR SyncState = 'NOT SYNCHRONIZING');
+
+    -- Jobs that started failing this week
+    INSERT INTO @Changes (ChangeType, ChangeDate, Description, Impact)
+    SELECT 'Job Started Failing', MAX(jt.LastRunDate),
+        jt.JobName + ' failed ' + CAST(COUNT(*) AS NVARCHAR) + ' times this week (was OK last week)',
+        CASE WHEN COUNT(*) > 5 THEN 'HIGH' ELSE 'MEDIUM' END
+    FROM [monitor].[JobHistory] jt
+    WHERE jt.CollectedAt >= @ThisWeekStart AND jt.LastRunStatus = 'Failed'
+        AND NOT EXISTS (
+            SELECT 1 FROM [monitor].[JobHistory] jl
+            WHERE jl.CollectedAt >= @LastWeekStart AND jl.CollectedAt < @LastWeekEnd
+                AND jl.JobName = jt.JobName AND jl.LastRunStatus = 'Failed'
+        )
+    GROUP BY jt.JobName;
+
+    SELECT ChangeType, ChangeDate, Description, Impact
+    FROM @Changes
+    ORDER BY 
+        CASE Impact WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END,
+        ChangeDate DESC;
 
     -- ============================================================
-    -- SECTION 6: AG Sync History
+    -- RESULT SET 5: BASELINE ANOMALIES (Weekly Summary)
     -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128279; Histórico AG' ELSE '&#128279; Availability Group History' END + '</h2>';
-
-    SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-        + '<tr style="background:#0f172a;color:white;">'
-        + '<th style="padding:8px;text-align:left;">AG Name</th>'
-        + '<th style="padding:8px;text-align:left;">Replica</th>'
-        + '<th style="padding:8px;text-align:center;">Avg Lag (s)</th>'
-        + '<th style="padding:8px;text-align:center;">Max Lag (s)</th>'
-        + '<th style="padding:8px;text-align:right;">Avg Send Queue (MB)</th>'
-        + '<th style="padding:8px;text-align:right;">Avg Redo Queue (MB)</th></tr>';
-
-    SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY ag.AgName, ag.ReplicaServer) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-        + '<td style="padding:6px 8px;">' + ag.AgName + '</td>'
-        + '<td style="padding:6px 8px;">' + ag.ReplicaServer + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;color:' 
-            + CASE WHEN ag.AvgLag >= 120 THEN '#dc2626' WHEN ag.AvgLag >= 30 THEN '#d97706' ELSE '#059669' END + ';">'
-            + CAST(ag.AvgLag AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;text-align:center;color:' 
-            + CASE WHEN ag.MaxLag >= 120 THEN '#dc2626' WHEN ag.MaxLag >= 30 THEN '#d97706' ELSE '#059669' END + ';font-weight:600;">'
-            + CAST(ag.MaxLag AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + CAST(CAST(ag.AvgSendQueueMB AS DECIMAL(10,1)) AS NVARCHAR) + '</td>'
-        + '<td style="padding:6px 8px;text-align:right;">' + CAST(CAST(ag.AvgRedoQueueMB AS DECIMAL(10,1)) AS NVARCHAR) + '</td></tr>'
-    FROM (
+    IF OBJECT_ID('monitor.BaselineAnomalies', 'U') IS NOT NULL
+    BEGIN
         SELECT 
-            AgName, ReplicaServer,
-            AVG(ISNULL(SecondsBehindPrimary, 0)) AS AvgLag,
-            MAX(ISNULL(SecondsBehindPrimary, 0)) AS MaxLag,
-            AVG(ISNULL(LogSendQueueSizeKB, 0) / 1024.0) AS AvgSendQueueMB,
-            AVG(ISNULL(RedoQueueSizeKB, 0) / 1024.0) AS AvgRedoQueueMB
-        FROM [monitor].[AgHealthHistory]
-        WHERE CollectedAt >= @ThisWeekStart
-        GROUP BY AgName, ReplicaServer
-    ) ag;
-
-    SET @HTML = @HTML + '</table>';
-
-    -- ============================================================
-    -- SECTION 7: Performance Baseline Deviations
-    -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#128200; Desvios do Baseline' ELSE '&#128200; Baseline Deviations' END + '</h2>';
-
-    -- Check if baselines table exists and has data
-    IF OBJECT_ID('monitor.PerformanceBaselines', 'U') IS NOT NULL
-    BEGIN
-        SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-            + '<tr style="background:#0f172a;color:white;">'
-            + '<th style="padding:8px;text-align:left;">Metric</th>'
-            + '<th style="padding:8px;text-align:center;">Baseline</th>'
-            + '<th style="padding:8px;text-align:center;">Current Avg</th>'
-            + '<th style="padding:8px;text-align:center;">Deviation</th></tr>';
-
-        SELECT @HTML = @HTML + '<tr style="background:' + CASE WHEN ROW_NUMBER() OVER (ORDER BY b.MetricName) % 2 = 0 THEN '#f8fafc' ELSE 'white' END + ';">'
-            + '<td style="padding:6px 8px;">' + b.MetricName + '</td>'
-            + '<td style="padding:6px 8px;text-align:center;">' + CAST(CAST(b.BaselineValue AS DECIMAL(10,2)) AS NVARCHAR) + '</td>'
-            + '<td style="padding:6px 8px;text-align:center;">' + CAST(CAST(b.CurrentValue AS DECIMAL(10,2)) AS NVARCHAR) + '</td>'
-            + '<td style="padding:6px 8px;text-align:center;color:' 
-                + CASE WHEN ABS(b.DeviationPct) >= 50 THEN '#dc2626' WHEN ABS(b.DeviationPct) >= 25 THEN '#d97706' ELSE '#059669' END + ';font-weight:600;">'
-                + CASE WHEN b.DeviationPct > 0 THEN '+' ELSE '' END + CAST(CAST(b.DeviationPct AS DECIMAL(5,1)) AS NVARCHAR) + '%</td></tr>'
-        FROM (
-            SELECT 
-                pb.MetricName,
-                pb.BaselineAvg AS BaselineValue,
-                CASE pb.MetricName
-                    WHEN 'CPU_Avg' THEN (SELECT AVG(CAST(SqlCpuPct AS DECIMAL(10,2))) FROM [monitor].[CpuHistory] WHERE CollectedAt >= @ThisWeekStart)
-                    WHEN 'PLE_Avg' THEN (SELECT AVG(CAST(PageLifeExpectancy AS DECIMAL(10,2))) FROM [monitor].[MemoryHistory] WHERE CollectedAt >= @ThisWeekStart)
-                    WHEN 'DiskUsed_Max' THEN (SELECT MAX(UsedPct) FROM [monitor].[DiskHistory] WHERE CollectedAt >= @ThisWeekStart)
-                    ELSE NULL
-                END AS CurrentValue,
-                CASE 
-                    WHEN pb.BaselineAvg = 0 THEN 0
-                    ELSE ((CASE pb.MetricName
-                        WHEN 'CPU_Avg' THEN (SELECT AVG(CAST(SqlCpuPct AS DECIMAL(10,2))) FROM [monitor].[CpuHistory] WHERE CollectedAt >= @ThisWeekStart)
-                        WHEN 'PLE_Avg' THEN (SELECT AVG(CAST(PageLifeExpectancy AS DECIMAL(10,2))) FROM [monitor].[MemoryHistory] WHERE CollectedAt >= @ThisWeekStart)
-                        WHEN 'DiskUsed_Max' THEN (SELECT MAX(UsedPct) FROM [monitor].[DiskHistory] WHERE CollectedAt >= @ThisWeekStart)
-                        ELSE NULL
-                    END) - pb.BaselineAvg) / pb.BaselineAvg * 100
-                END AS DeviationPct
-            FROM [monitor].[PerformanceBaselines] pb
-            WHERE pb.IsActive = 1
-        ) b
-        WHERE b.CurrentValue IS NOT NULL
-            AND ABS(b.DeviationPct) >= 10;
-
-        SET @HTML = @HTML + '</table>';
+            MetricName,
+            COUNT(*) AS OccurrenceCount,
+            MAX(DeviationMultiplier) AS MaxDeviation,
+            AVG(DeviationMultiplier) AS AvgDeviation,
+            MAX(Severity) AS WorstSeverity,
+            MIN(DetectedAt) AS FirstDetected,
+            MAX(DetectedAt) AS LastDetected,
+            MAX(Message) AS LatestMessage
+        FROM [monitor].[BaselineAnomalies]
+        WHERE DetectedAt >= @ThisWeekStart
+        GROUP BY MetricName
+        ORDER BY MAX(CASE Severity WHEN 'Critical' THEN 1 ELSE 2 END), COUNT(*) DESC;
     END
     ELSE
     BEGIN
-        SET @HTML = @HTML + '<p style="color:#64748b;font-style:italic;">'
-            + CASE @Language WHEN 'ptbr' THEN 'Baselines ainda não calculados. Execute usp_Maintenance_UpdateBaselines.' 
-                ELSE 'Baselines not yet calculated. Run usp_Maintenance_UpdateBaselines.' END + '</p>';
+        SELECT 
+            CAST(NULL AS NVARCHAR(100)) AS MetricName,
+            CAST(NULL AS INT) AS OccurrenceCount,
+            CAST(NULL AS DECIMAL(8,2)) AS MaxDeviation,
+            CAST(NULL AS DECIMAL(8,2)) AS AvgDeviation,
+            CAST(NULL AS NVARCHAR(20)) AS WorstSeverity,
+            CAST(NULL AS DATETIME2) AS FirstDetected,
+            CAST(NULL AS DATETIME2) AS LastDetected,
+            CAST(NULL AS NVARCHAR(500)) AS LatestMessage
+        WHERE 1 = 0;
     END;
 
     -- ============================================================
-    -- SECTION 8: Recommendations
+    -- RESULT SET 6: RECOMMENDATIONS
     -- ============================================================
-    SET @HTML = @HTML + '<h2 style="font-size:18px;color:#0f172a;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-top:28px;">'
-        + CASE @Language WHEN 'ptbr' THEN '&#9889; Recomendações' ELSE '&#9889; Recommendations' END + '</h2>';
+    DECLARE @Recommendations TABLE (
+        Priority    INT,
+        Category    NVARCHAR(50),
+        Message     NVARCHAR(500),
+        ActionItem  NVARCHAR(500)
+    );
 
-    DECLARE @RecHTML NVARCHAR(MAX) = '';
-    DECLARE @RecCount INT = 0;
+    -- Capacity critical
+    IF EXISTS (
+        SELECT 1 FROM [monitor].[DiskHistory] 
+        WHERE CollectedAt >= DATEADD(HOUR, -6, @Now) AND UsedPct >= 90
+    )
+        INSERT INTO @Recommendations VALUES (1, 'Capacity',
+            'One or more drives above 90% usage.',
+            'Immediate capacity expansion or data archival required.');
 
-    -- High priority: Disk space critical
-    IF EXISTS (SELECT 1 FROM [monitor].[DiskHistory] WHERE CollectedAt >= DATEADD(HOUR, -6, SYSUTCDATETIME()) AND UsedPct >= 90)
-    BEGIN
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#dc2626;font-weight:700;">P1</td>'
-            + '<td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'Disco com uso acima de 90%. Ação imediata necessária.' 
-                ELSE 'Disk usage above 90%. Immediate action required.' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
-
-    -- High priority: Indexes needing rebuild
-    IF EXISTS (SELECT 1 FROM [monitor].[IndexHealthHistory] WHERE CollectedAt >= @ThisWeekStart AND FragmentationPct >= 30 AND PageCount >= 1000)
-    BEGIN
-        DECLARE @RebuildCount INT = (SELECT COUNT(DISTINCT IndexName) FROM [monitor].[IndexHealthHistory] 
-            WHERE CollectedAt >= @ThisWeekStart AND FragmentationPct >= 30 AND PageCount >= 1000);
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#d97706;font-weight:700;">P2</td>'
-            + '<td style="padding:8px;">' + CAST(@RebuildCount AS NVARCHAR) + ' '
-            + CASE @Language WHEN 'ptbr' THEN 'índices precisam de REBUILD (fragmentação > 30%).' 
-                ELSE 'indexes need REBUILD (fragmentation > 30%).' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
-
-    -- Medium: CPU trending up
+    -- CPU trending up significantly
     IF @CpuAvgThis > ISNULL(@CpuAvgLast, 0) * 1.2 AND @CpuAvgThis > 50
-    BEGIN
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#d97706;font-weight:700;">P2</td>'
-            + '<td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'CPU com tendência de alta (+20% vs semana anterior). Investigar top queries.' 
-                ELSE 'CPU trending up (+20% vs last week). Investigate top queries.' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
+        INSERT INTO @Recommendations VALUES (2, 'Performance',
+            'CPU avg increased ' + CAST(CASE WHEN @CpuAvgLast > 0 
+                THEN CAST(ROUND((@CpuAvgThis - @CpuAvgLast) * 100.0 / @CpuAvgLast, 0) AS INT) ELSE 0 END AS NVARCHAR) + '% week-over-week.',
+            'Review top queries. Consider index optimization or workload redistribution.');
 
-    -- Medium: PLE dropping
+    -- PLE degradation
     IF @PleAvgThis < ISNULL(@PleAvgLast, 9999) * 0.7 AND @PleAvgThis < 1000
-    BEGIN
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#d97706;font-weight:700;">P2</td>'
-            + '<td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'PLE caindo significativamente. Considerar aumento de memória ou otimização de queries.' 
-                ELSE 'PLE dropping significantly. Consider memory increase or query optimization.' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
+        INSERT INTO @Recommendations VALUES (2, 'Memory',
+            'PLE dropped significantly vs last week (avg ' + CAST(ISNULL(@PleAvgThis, 0) AS NVARCHAR) + 's vs ' + CAST(ISNULL(@PleAvgLast, 0) AS NVARCHAR) + 's).',
+            'Investigate memory-intensive queries. Consider memory increase.');
 
-    -- Medium: Blocking increase
+    -- Blocking doubled
     IF @BlockingThis > ISNULL(@BlockingLast, 0) * 2 AND @BlockingThis > 10
-    BEGIN
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#d97706;font-weight:700;">P2</td>'
-            + '<td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'Bloqueios dobraram vs semana anterior. Revisar queries e isolation levels.' 
-                ELSE 'Blocking events doubled vs last week. Review queries and isolation levels.' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
+        INSERT INTO @Recommendations VALUES (2, 'Concurrency',
+            'Blocking events doubled (' + CAST(@BlockingThis AS NVARCHAR) + ' vs ' + CAST(@BlockingLast AS NVARCHAR) + ').',
+            'Review blocking chains. Consider RCSI, query tuning, or lock escalation settings.');
 
-    -- Low: Backup gaps
-    IF EXISTS (SELECT 1 FROM [monitor].[BackupHistory] b WHERE b.CollectedAt >= DATEADD(HOUR, -6, SYSUTCDATETIME()) AND b.BackupType = 'D' AND b.HoursSinceLastBackup > 25)
-    BEGIN
-        SET @RecHTML = @RecHTML + '<tr><td style="padding:8px;color:#2563eb;font-weight:700;">P3</td>'
-            + '<td style="padding:8px;">' + CASE @Language WHEN 'ptbr' THEN 'Alguns bancos com backup full atrasado (>25h). Verificar jobs de backup.' 
-                ELSE 'Some databases with stale full backup (>25h). Check backup jobs.' END + '</td></tr>';
-        SET @RecCount += 1;
-    END;
+    -- Index maintenance needed
+    DECLARE @FragIndexCount INT;
+    SELECT @FragIndexCount = COUNT(DISTINCT IndexName) 
+    FROM [monitor].[IndexHealthHistory]
+    WHERE CollectedAt >= @ThisWeekStart AND FragmentationPct >= 30 AND PageCount >= 1000;
+    
+    IF @FragIndexCount > 0
+        INSERT INTO @Recommendations VALUES (2, 'Maintenance',
+            CAST(@FragIndexCount AS NVARCHAR) + ' indexes with >30% fragmentation.',
+            'Schedule index rebuild during maintenance window.');
 
-    IF @RecCount = 0
-    BEGIN
-        SET @HTML = @HTML + '<p style="color:#059669;font-weight:600;">&#9989; '
-            + CASE @Language WHEN 'ptbr' THEN 'Nenhuma recomendação crítica esta semana. Bom trabalho!' 
-                ELSE 'No critical recommendations this week. Good job!' END + '</p>';
-    END
-    ELSE
-    BEGIN
-        SET @HTML = @HTML + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
-            + '<tr style="background:#0f172a;color:white;">'
-            + '<th style="padding:8px;text-align:center;">' + CASE @Language WHEN 'ptbr' THEN 'Prioridade' ELSE 'Priority' END + '</th>'
-            + '<th style="padding:8px;text-align:left;">' + CASE @Language WHEN 'ptbr' THEN 'Recomendação' ELSE 'Recommendation' END + '</th></tr>'
-            + @RecHTML + '</table>';
-    END;
+    -- Error rate increase
+    IF @ErrorsThis > ISNULL(@ErrorsLast, 0) * 2 AND @ErrorsThis > 20
+        INSERT INTO @Recommendations VALUES (2, 'Reliability',
+            'Error log entries increased significantly (' + CAST(@ErrorsThis AS NVARCHAR) + ' vs ' + CAST(@ErrorsLast AS NVARCHAR) + ').',
+            'Review new error patterns in "What Changed" section.');
+
+    -- Backup gaps
+    IF EXISTS (SELECT 1 FROM [monitor].[BackupHistory] WHERE CollectedAt >= DATEADD(HOUR, -6, @Now) AND BackupType = 'D' AND HoursSinceLastBackup > 48)
+        INSERT INTO @Recommendations VALUES (1, 'DR',
+            'Databases with full backup older than 48 hours detected.',
+            'Verify backup jobs. Check for disk space issues on backup target.');
+
+    -- Baseline anomalies summary
+    DECLARE @AnomalyCount INT = 0;
+    IF OBJECT_ID('monitor.BaselineAnomalies', 'U') IS NOT NULL
+        SELECT @AnomalyCount = COUNT(DISTINCT MetricName) FROM [monitor].[BaselineAnomalies] WHERE DetectedAt >= @ThisWeekStart;
+    
+    IF @AnomalyCount > 0
+        INSERT INTO @Recommendations VALUES (2, 'Baseline',
+            CAST(@AnomalyCount AS NVARCHAR) + ' metric(s) deviated from baseline this week.',
+            'Review baseline anomalies section. Consider recapturing baselines if workload changed intentionally.');
+
+    SELECT Priority, Category, Message, ActionItem
+    FROM @Recommendations
+    ORDER BY Priority, Category;
 
     -- ============================================================
-    -- FOOTER & SEND
+    -- RESULT SET 7: TOP WAITS COMPARISON
     -- ============================================================
-    SET @HTML = @HTML + '</div>';  -- Close padding div
-    SET @HTML = @HTML + '<div style="background:#f1f5f9;padding:16px 32px;font-size:11px;color:#64748b;text-align:center;">'
-        + 'SQL Health Monitor - Weekly Deep Dive | ' + @ServerName + ' | Generated: ' + FORMAT(SYSUTCDATETIME(), 'yyyy-MM-dd HH:mm:ss') + ' UTC'
-        + '</div></div></body></html>';
+    SELECT 
+        ISNULL(tw.WaitType, lw.WaitType) AS WaitType,
+        ISNULL(tw.TotalDeltaMs, 0) AS DeltaMs_ThisWeek,
+        ISNULL(lw.TotalDeltaMs, 0) AS DeltaMs_LastWeek,
+        CASE 
+            WHEN ISNULL(lw.TotalDeltaMs, 0) = 0 THEN NULL
+            ELSE CAST(ROUND((CAST(ISNULL(tw.TotalDeltaMs, 0) - ISNULL(lw.TotalDeltaMs, 0) AS DECIMAL(18,2)) / NULLIF(lw.TotalDeltaMs, 0)) * 100, 1) AS DECIMAL(10,1))
+        END AS ChangePct
+    FROM (
+        SELECT TOP 10 WaitType, SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) AS TotalDeltaMs
+        FROM [monitor].[WaitStatsHistory]
+        WHERE CollectedAt >= @ThisWeekStart
+        GROUP BY WaitType
+        ORDER BY SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) DESC
+    ) tw
+    FULL OUTER JOIN (
+        SELECT TOP 10 WaitType, SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) AS TotalDeltaMs
+        FROM [monitor].[WaitStatsHistory]
+        WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd
+        GROUP BY WaitType
+        ORDER BY SUM(ISNULL(DeltaWaitTimeMs, WaitTimeMs)) DESC
+    ) lw ON tw.WaitType = lw.WaitType
+    ORDER BY ISNULL(tw.TotalDeltaMs, 0) DESC;
 
-    -- Debug or send
-    IF @DebugMode = 1
+    -- ============================================================
+    -- LOG REPORT GENERATION
+    -- ============================================================
+    IF @DebugMode = 0
     BEGIN
-        SELECT @HTML AS HtmlReport;
-        RETURN;
+        INSERT INTO [monitor].[ReportHistory] (ReportType, Recipients, Language, Success)
+        VALUES ('Weekly', ISNULL(@OverrideRecipients, 'PowerShell'), @Language, 1);
     END;
 
-    -- Send email
-    DECLARE @Subject NVARCHAR(200) = @SubjectPrefix + ' &#128202; ' + @Title + ' - ' + @WeekStr;
-
-    EXEC msdb.dbo.sp_send_dbmail
-        @profile_name = @ProfileName,
-        @recipients = @Recipients,
-        @copy_recipients = @CcRecipients,
-        @subject = @Subject,
-        @body = @HTML,
-        @body_format = 'HTML';
-
-    -- Log report
-    INSERT INTO [monitor].[ReportHistory] (ReportType, Recipients, Language, Success)
-    VALUES ('Weekly', @Recipients, @Language, 1);
+    PRINT '✓ Weekly deep dive report generated for period: ' + @WeekStr;
 END;
 GO
 
-PRINT '✓ Weekly Deep Dive report [monitor].[usp_Report_WeeklyDeepDive] created.';
+PRINT '✓ Procedure [monitor].[usp_GenerateWeeklyReport] created.';
 GO
