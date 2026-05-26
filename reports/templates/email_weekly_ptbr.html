@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Relatório Semanal de Análise SQL</title>
+</head>
+<body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:0;background:#f8fafc;">
+<div style="max-width:700px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:24px 32px;color:white;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;">&#128202; Relatório Semanal de Análise SQL</h1>
+        <p style="margin:8px 0 0;opacity:0.8;font-size:13px;">{{ServerName}} | Semana de {{WeekStart}} a {{WeekEnd}}</p>
+    </div>
+
+    <!-- Status Banner -->
+    <div style="background:{{StatusColor}};padding:12px 32px;color:white;font-weight:600;font-size:14px;">
+        {{StatusMessage}}
+    </div>
+
+    <!-- Resumo Executivo -->
+    <div style="padding:24px 32px;">
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Resumo Executivo</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            <tr>
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:20%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Alertas</div>
+                    <div style="font-size:24px;font-weight:700;color:{{AlertsColor}};">{{AlertsCount}}</div>
+                    <div style="font-size:10px;color:#94a3b8;">na semana</div>
+                </td>
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:20%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">CPU Média</div>
+                    <div style="font-size:24px;font-weight:700;color:{{CpuColor}};">{{AvgCpu}}%</div>
+                    <div style="font-size:10px;color:#94a3b8;">pico: {{PeakCpu}}%</div>
+                </td>
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:20%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Disco</div>
+                    <div style="font-size:24px;font-weight:700;color:{{DiskColor}};">{{DiskMaxPct}}%</div>
+                    <div style="font-size:10px;color:#94a3b8;">max usado</div>
+                </td>
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:20%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Deadlocks</div>
+                    <div style="font-size:24px;font-weight:700;color:{{DeadlocksColor}};">{{DeadlocksCount}}</div>
+                    <div style="font-size:10px;color:#94a3b8;">na semana</div>
+                </td>
+                <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;border-radius:8px;width:20%;">
+                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Jobs Falhos</div>
+                    <div style="font-size:24px;font-weight:700;color:{{JobsColor}};">{{JobsFailedCount}}</div>
+                    <div style="font-size:10px;color:#94a3b8;">na semana</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Comparativo Semanal -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Comparativo Semanal</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Métrica</th>
+                <th style="padding:8px;text-align:right;">Semana Anterior</th>
+                <th style="padding:8px;text-align:right;">Esta Semana</th>
+                <th style="padding:8px;text-align:center;">Tendência</th>
+            </tr>
+            {{WeekComparisonRows}}
+        </table>
+
+        <!-- Tendências de Capacidade e Crescimento -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Tendências de Capacidade e Crescimento</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Banco de Dados</th>
+                <th style="padding:8px;text-align:right;">Dados (MB)</th>
+                <th style="padding:8px;text-align:right;">Log (MB)</th>
+                <th style="padding:8px;text-align:right;">Crescimento 7d</th>
+                <th style="padding:8px;text-align:center;">Projeção 30d</th>
+            </tr>
+            {{CapacityRows}}
+        </table>
+
+        <!-- Baselines de Performance -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Baselines de Performance</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Métrica</th>
+                <th style="padding:8px;text-align:right;">Baseline</th>
+                <th style="padding:8px;text-align:right;">Média Atual</th>
+                <th style="padding:8px;text-align:right;">Desvio</th>
+                <th style="padding:8px;text-align:center;">Status</th>
+            </tr>
+            {{BaselineRows}}
+        </table>
+
+        <!-- Principais Esperas (Semanal) -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Principais Esperas (7 dias)</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Tipo de Espera</th>
+                <th style="padding:8px;text-align:right;">Total (ms)</th>
+                <th style="padding:8px;text-align:right;">Média/Dia (ms)</th>
+                <th style="padding:8px;text-align:center;">Tendência</th>
+            </tr>
+            {{WaitStatsRows}}
+        </table>
+
+        <!-- Resumo de Alertas -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Resumo de Alertas</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Métrica</th>
+                <th style="padding:8px;text-align:center;">Qtd</th>
+                <th style="padding:8px;text-align:center;">Severidade</th>
+                <th style="padding:8px;text-align:left;">Último Disparo</th>
+            </tr>
+            {{AlertSummaryRows}}
+        </table>
+
+        <!-- Recomendações -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">&#128161; Recomendações</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:center;">Prioridade</th>
+                <th style="padding:8px;text-align:left;">Recomendação</th>
+                <th style="padding:8px;text-align:left;">Impacto</th>
+            </tr>
+            {{RecommendationRows}}
+        </table>
+
+        <!-- Conformidade de Backup -->
+        <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin-top:24px;">Conformidade de Backup</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="background:#0f172a;color:white;">
+                <th style="padding:8px;text-align:left;">Banco de Dados</th>
+                <th style="padding:8px;text-align:center;">Full</th>
+                <th style="padding:8px;text-align:center;">Diff</th>
+                <th style="padding:8px;text-align:center;">Log</th>
+                <th style="padding:8px;text-align:center;">Conformidade</th>
+            </tr>
+            {{BackupComplianceRows}}
+        </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f1f5f9;padding:16px 32px;font-size:11px;color:#64748b;text-align:center;">
+        SQL Health Monitor | {{ServerName}} | Gerado: {{GeneratedAt}} UTC
+    </div>
+
+</div>
+</body>
+</html>

@@ -34,10 +34,30 @@ This toolkit makes your DBA work **visible**. It doesn't just alert when things 
 - Week-over-week comparisons
 
 ### Real-time Alerts
-- Configurable thresholds
+- Configurable thresholds with default values for all metrics
 - Critical: Log full, disk space, corruption, AG unhealthy
 - Warning: CPU sustained, blocking > N seconds, CDC latency
 - Info: Job completed, failover detected, config change
+- Alert history with acknowledge/resolve lifecycle
+- Cooldown mechanism to prevent alert spam
+
+### Dashboard View
+- Single-query health overview (`monitor.vw_CurrentHealth`)
+- Traffic light status for every subsystem
+- Overall health score (HEALTHY / WARNING / CRITICAL)
+
+### Recommendations Engine
+- Automated analysis of collected data
+- Actionable recommendations with priority and impact
+- Categories: Index, Backup, Capacity, Performance, AG, Deadlocks, TempDB
+- Includes suggested T-SQL fix commands
+
+### Collectors
+- CPU, Memory, Disk, Wait Stats, Blocking
+- AG Health, CDC Health, Top Queries, Index Health
+- Backup Status, Job History, TempDB, Log Growth, Error Log
+- **Deadlocks** — Parses system_health XE session deadlock graphs
+- **Database Growth** — Tracks data/log file sizes over time with deltas
 
 ### Output
 - Beautiful HTML emails via Database Mail
@@ -56,7 +76,8 @@ sql-health-monitor/
 │   ├── 02-create-reports.sql       -- Report generation procedures
 │   ├── 03-create-alerts.sql        -- Alert threshold procedures
 │   ├── 04-create-jobs.sql          -- SQL Agent job creation
-│   └── 05-configure.sql            -- Initial configuration
+│   ├── 05-configure.sql            -- Initial configuration
+│   └── 06-alert-history.sql        -- Alert history, cooldown & lifecycle
 ├── collectors/
 │   ├── collect_cpu.sql
 │   ├── collect_memory.sql
@@ -71,22 +92,27 @@ sql-health-monitor/
 │   ├── collect_job_history.sql
 │   ├── collect_tempdb.sql
 │   ├── collect_log_growth.sql
-│   └── collect_errorlog.sql
+│   ├── collect_errorlog.sql
+│   ├── collect_deadlocks.sql       -- Deadlock graph extraction from XE
+│   └── collect_database_growth.sql -- Data/log file size tracking
 ├── reports/
 │   ├── daily_health_check.sql
 │   ├── weekly_deep_dive.sql
+│   ├── recommendations_engine.sql  -- Automated recommendation generation
 │   └── templates/
 │       ├── email_daily_en.html
 │       ├── email_daily_ptbr.html
 │       ├── email_weekly_en.html
 │       └── email_weekly_ptbr.html
 ├── alerts/
-│   ├── alert_engine.sql
-│   ├── thresholds_default.sql
+│   ├── alert_engine.sql            -- Threshold evaluation & notification
+│   ├── thresholds_default.sql      -- Default threshold INSERT script
 │   └── alert_actions.sql
 ├── config/
-│   ├── settings.sql                -- Central config table
-│   └── languages.sql               -- i18n strings
+│   ├── settings.sql                -- Default settings INSERT script
+│   └── languages.sql               -- i18n strings (EN + PT-BR)
+├── views/
+│   └── vw_CurrentHealth.sql        -- Dashboard: single-query health overview
 ├── maintenance/
 │   ├── purge_old_data.sql          -- Retention cleanup
 │   └── update_baselines.sql        -- Baseline recalculation

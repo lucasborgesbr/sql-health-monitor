@@ -201,12 +201,14 @@ BEGIN
     END;
 
     -- Log alerts to history
-    INSERT INTO [monitor].[AlertHistory] (MetricName, Severity, CurrentValue, ThresholdValue, Message)
+    INSERT INTO [monitor].[AlertHistory] (MetricName, Severity, CurrentValue, ThresholdValue, Message, Context, NotificationSent)
     SELECT 
         MetricName, Severity, CurrentValue, ThresholdValue,
         MetricName + ' = ' + CAST(CurrentValue AS NVARCHAR) 
             + ' (threshold: ' + CAST(ThresholdValue AS NVARCHAR) + ')'
-            + ISNULL(' [' + Context + ']', '')
+            + ISNULL(' [' + Context + ']', ''),
+        Context,
+        0  -- Will be set to 1 after email is sent
     FROM @Alerts;
 
     -- Update cooldown
@@ -282,6 +284,12 @@ BEGIN
         @subject = @Subject,
         @body = @AlertHTML,
         @body_format = 'HTML';
+
+    -- Mark alerts as notified
+    UPDATE [monitor].[AlertHistory]
+    SET NotificationSent = 1
+    WHERE FiredAt >= DATEADD(SECOND, -5, @Now)
+        AND NotificationSent = 0;
 END;
 GO
 
