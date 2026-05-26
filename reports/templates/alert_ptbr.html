@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>SQL Health - ALERTA</title>
+<style>
+body { font-family: Segoe UI, Arial, sans-serif; margin: 20px; color: #333; }
+h1 { color: #c0392b; border-bottom: 2px solid #e74c3c; padding-bottom: 10px; }
+h2 { color: #2c3e50; margin-top: 30px; }
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th { background: #e74c3c; color: white; padding: 10px; text-align: left; }
+td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
+tr:nth-child(even) { background: #fdf2f2; }
+.status-green { color: #27ae60; } .status-yellow { color: #f39c12; } .status-red { color: #e74c3c; }
+.priority-high { background: #e74c3c; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; }
+.priority-medium { background: #f39c12; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; }
+.priority-low { background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.85em; }
+.alert-banner { background: #fdf2f2; border: 2px solid #e74c3c; border-radius: 5px; padding: 15px; margin: 15px 0; }
+.footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #ddd; color: #777; font-size: 0.85em; }
+</style></head>
+<body>
+<h1>&#x26A0;&#xFE0F; Alerta de Saúde - SQL Server</h1>
+<p><strong>Servidor:</strong> {{SERVER_INSTANCE}} | <strong>Gerado em:</strong> {{GENERATED_AT}}</p>
+<div class="alert-banner"><strong>Um ou mais limites de saúde foram ultrapassados. Atenção imediata pode ser necessária.</strong></div>
+<h2>Detalhes do Alerta</h2>
+{{ALERT_DETAILS}}
+<h2>Saúde Atual</h2>
+{{HEALTH_STATUS}}
+<h2>Ações Recomendadas</h2>
+{{RECOMMENDATIONS}}
+<div class="footer">Gerado por SQL Health Monitor v1.0 | Tipo: {{REPORT_TYPE}}</div>
+</body></html>

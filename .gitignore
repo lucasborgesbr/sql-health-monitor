@@ -1,0 +1,19 @@
+# Logs
+*.log
+Logs/
+
+# PowerShell
+*.ps1xml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Credentials (never commit)
+*.credential
+*.pfx
+*.key

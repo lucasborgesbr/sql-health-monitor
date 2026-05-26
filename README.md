@@ -1,187 +1,192 @@
 # SQL Health Monitor
 
-**Proactive SQL Server monitoring and daily health reporting via Database Mail.**
-
-Inspired by [First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and [Power Alerts](https://poweralerts.com.br/), but customized for your environment — not a generic tool.
-
-## Philosophy
-
-> "If a tree falls in the forest and no one is there to hear, did it make a sound?"
-
-This toolkit makes your DBA work **visible**. It doesn't just alert when things break — it proactively reports health, trends, and recommendations so leadership sees the value you deliver every day.
+Proactive SQL Server health monitoring, alerting, and reporting solution. Designed for production environments running SQL Server 2016+.
 
 ## Features
 
-### Daily Health Check (Email)
-- CPU, Memory, Disk utilization summary
-- Wait stats analysis (top waits, deltas)
-- AG synchronization status & latency
-- CDC health & retention
-- Backup status (last full/diff/log per DB)
-- Job failures in last 24h
-- Blocking events summary
-- Top resource-intensive queries
-- Index health (fragmentation, missing, unused)
-- TempDB utilization
-- Log file growth trends
-- Error log highlights
-
-### Weekly Deep Dive (Email)
-- Capacity planning trends
-- Performance baselines & deviations
-- Growth projections (data, log, tempdb)
-- Recommendations with priority
-- Week-over-week comparisons
-
-### Real-time Alerts
-- Configurable thresholds with default values for all metrics
-- Critical: Log full, disk space, corruption, AG unhealthy
-- Warning: CPU sustained, blocking > N seconds, CDC latency
-- Info: Job completed, failover detected, config change
-- Alert history with acknowledge/resolve lifecycle
-- Cooldown mechanism to prevent alert spam
-
-### Dashboard View
-- Single-query health overview (`monitor.vw_CurrentHealth`)
-- Traffic light status for every subsystem
-- Overall health score (HEALTHY / WARNING / CRITICAL)
-
-### Recommendations Engine
-- Automated analysis of collected data
-- Actionable recommendations with priority and impact
-- Categories: Index, Backup, Capacity, Performance, AG, Deadlocks, TempDB
-- Includes suggested T-SQL fix commands
-
-### Collectors
-- CPU, Memory, Disk, Wait Stats, Blocking
-- AG Health, CDC Health, Top Queries, Index Health
-- Backup Status, Job History, TempDB, Log Growth, Error Log
-- **Deadlocks** — Parses system_health XE session deadlock graphs
-- **Database Growth** — Tracks data/log file sizes over time with deltas
-
-### Output
-- Beautiful HTML emails via Database Mail
-- Traffic light system (🟢🟡🔴) for quick scanning
-- Multi-language support (EN / PT-BR)
-- Configurable detail level and recipients
+- **16 Health Collectors** — CPU, memory, disk, waits, blocking, deadlocks, AG, CDC, top queries, index health, backup status, jobs, error log, tempdb, log growth, database growth
+- **Alert Engine** — Configurable thresholds with real-time notifications
+- **HTML Reports** — Daily summaries, weekly deep dives, and alert notifications
+- **Multi-Language** — English and Portuguese (BR) support
+- **Recommendations Engine** — Actionable suggestions with priority levels
+- **Traffic Light Status** — 🟢🟡🔴 visual indicators for quick assessment
 
 ## Architecture
 
 ```
 sql-health-monitor/
-├── README.md
-├── install/
-│   ├── 00-create-schema.sql        -- Monitoring schema & tables
-│   ├── 01-create-collectors.sql    -- Data collection procedures
-│   ├── 02-create-reports.sql       -- Report generation procedures
-│   ├── 03-create-alerts.sql        -- Alert threshold procedures
-│   ├── 04-create-jobs.sql          -- SQL Agent job creation
-│   ├── 05-configure.sql            -- Initial configuration
-│   └── 06-alert-history.sql        -- Alert history, cooldown & lifecycle
-├── collectors/
-│   ├── collect_cpu.sql
-│   ├── collect_memory.sql
-│   ├── collect_disk.sql
-│   ├── collect_waits.sql
-│   ├── collect_blocking.sql
-│   ├── collect_ag_health.sql
-│   ├── collect_cdc_health.sql
-│   ├── collect_top_queries.sql
-│   ├── collect_index_health.sql
-│   ├── collect_backup_status.sql
-│   ├── collect_job_history.sql
-│   ├── collect_tempdb.sql
-│   ├── collect_log_growth.sql
-│   ├── collect_errorlog.sql
-│   ├── collect_deadlocks.sql       -- Deadlock graph extraction from XE
-│   └── collect_database_growth.sql -- Data/log file size tracking
+├── powershell/              # PowerShell orchestration layer
+│   ├── Invoke-SQLHealthMonitor.ps1   # Main orchestrator
+│   ├── Send-HealthReport.ps1         # Report generator/sender
+│   ├── Install-SQLHealthMonitor.ps1  # Automated installer
+│   ├── SQLHealthMonitor.psd1         # Module manifest
+│   └── config/
+│       └── default.json              # Default configuration
+├── collectors/              # T-SQL collection scripts
+├── alerts/                  # Alert engine and thresholds
 ├── reports/
-│   ├── daily_health_check.sql
-│   ├── weekly_deep_dive.sql
-│   ├── recommendations_engine.sql  -- Automated recommendation generation
-│   └── templates/
-│       ├── email_daily_en.html
-│       ├── email_daily_ptbr.html
-│       ├── email_weekly_en.html
-│       └── email_weekly_ptbr.html
-├── alerts/
-│   ├── alert_engine.sql            -- Threshold evaluation & notification
-│   ├── thresholds_default.sql      -- Default threshold INSERT script
-│   └── alert_actions.sql
-├── config/
-│   ├── settings.sql                -- Default settings INSERT script
-│   └── languages.sql               -- i18n strings (EN + PT-BR)
-├── views/
-│   └── vw_CurrentHealth.sql        -- Dashboard: single-query health overview
-├── maintenance/
-│   ├── purge_old_data.sql          -- Retention cleanup
-│   └── update_baselines.sql        -- Baseline recalculation
-├── powershell/
-│   ├── Deploy-SqlHealthMonitor.ps1 -- Multi-server deployment
-│   └── Test-Installation.ps1       -- Validation script
-└── docs/
-    ├── INSTALL.md
-    ├── CONFIGURATION.md
-    └── CUSTOMIZATION.md
+│   ├── templates/           # HTML email templates (EN + PT-BR)
+│   └── recommendations_engine.sql
+├── config/                  # Database configuration scripts
+├── views/                   # SQL views for reporting
+└── install/                 # Database install scripts (ordered)
 ```
 
 ## Requirements
 
-- SQL Server 2016+ (2019/2022 recommended)
-- Database Mail configured
-- SQL Agent running
-- `sysadmin` or equivalent for installation
-- Dedicated monitoring database (recommended: `DBA_Monitor`)
+- SQL Server 2016+ (optimized for 2022)
+- Windows PowerShell 5.1 or PowerShell 7+
+- [dbatools](https://dbatools.io/) module
+- Database Mail configured (or SMTP access)
+- sysadmin or db_owner permissions for installation
 
 ## Quick Start
 
-```sql
--- 1. Create monitoring database
-CREATE DATABASE [DBA_Monitor];
-GO
+### 1. Install dbatools (if not already installed)
 
--- 2. Run install scripts in order
--- 00-create-schema.sql
--- 01-create-collectors.sql
--- ...
-
--- 3. Configure
-EXEC [monitor].[usp_Configure]
-    @EmailRecipients = 'your@email.com',
-    @Language = 'en',  -- 'en' or 'ptbr'
-    @DailyReportTime = '07:00',
-    @WeeklyReportDay = 'Monday';
+```powershell
+Install-Module dbatools -Scope CurrentUser -Force
 ```
+
+### 2. Deploy the solution
+
+```powershell
+Import-Module .\powershell\SQLHealthMonitor.psd1
+
+# Full installation with SQL Agent jobs
+Install-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' `
+    -EmailProfile 'DBA Mail' `
+    -Recipients 'dba-team@company.com' `
+    -Language EN
+
+# Installation without Agent jobs (manual scheduling)
+Install-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -SkipAgentJobs
+```
+
+### 3. Run manually
+
+```powershell
+# Collect metrics
+Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType Collection -Verbose
+
+# Generate daily report
+Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType DailyReport -Language EN
+
+# Generate weekly deep dive
+Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType WeeklyReport -Language PTBR
+
+# Check alerts
+Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType Alert
+```
+
+### 4. Test with WhatIf
+
+```powershell
+# Preview what would happen without executing
+Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType Collection -WhatIf
+```
+
+## PowerShell Module Usage
+
+### Invoke-SQLHealthMonitor
+
+Main orchestrator that ties collectors, alerts, and reports together.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| ServerInstance | string | (required) | SQL Server instance |
+| Database | string | SQLHealthMonitor | Monitor database name |
+| ConfigProfile | string | DEFAULT | Config profile in database |
+| RunType | string | (required) | Collection, DailyReport, WeeklyReport, Alert |
+| Language | string | EN | EN or PTBR |
+| ConfigPath | string | config/default.json | Path to JSON config |
+
+### Send-HealthReport
+
+Generates HTML reports and sends via Database Mail or SMTP.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| ServerInstance | string | (required) | SQL Server instance |
+| ReportType | string | (required) | Daily, Weekly, Alert |
+| Recipients | string[] | from config | Email recipients |
+| Language | string | EN | EN or PTBR |
+| OutputPath | string | (none) | Save HTML locally |
+
+### Install-SQLHealthMonitor
+
+Deploys database objects and creates SQL Agent jobs.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| ServerInstance | string | (required) | Target SQL Server |
+| Database | string | SQLHealthMonitor | Database name |
+| Schedule | string | Hourly | Hourly or Daily collection |
+| EmailProfile | string | (none) | Database Mail profile |
+| Recipients | string[] | (none) | Report recipients |
+| SkipAgentJobs | switch | false | Skip Agent job creation |
+| Force | switch | false | Overwrite without prompting |
 
 ## Configuration
 
-All settings stored in `[monitor].[Settings]` table:
+Edit `powershell/config/default.json` to customize:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Language | en | Report language (en/ptbr) |
-| DailyReportTime | 07:00 | When to send daily report |
-| WeeklyReportDay | Monday | Day for weekly deep dive |
-| RetentionDays | 90 | How long to keep collected data |
-| CPUWarningThreshold | 80 | CPU % to trigger warning |
-| CPUCriticalThreshold | 95 | CPU % to trigger critical |
-| BlockingThresholdSec | 30 | Seconds before blocking alert |
-| DiskWarningPct | 85 | Disk usage % warning |
-| DiskCriticalPct | 95 | Disk usage % critical |
+- **Connection** — Server, database, timeouts
+- **Schedule** — Collection intervals, report times
+- **Email** — Method (DatabaseMail/SMTP), recipients per report type
+- **Collectors** — Enable/disable specific collectors
+- **Retention** — Data retention periods
+- **Logging** — Log path and verbosity
 
-## Multi-Language
+## SQL Agent Jobs Created
 
-Reports support EN and PT-BR out of the box. Language strings are stored in `[monitor].[Languages]` table — add your own or customize existing ones.
+| Job | Schedule | Description |
+|-----|----------|-------------|
+| SQLHealthMonitor - Collection | Every 15 min (or hourly) | Collects all health metrics |
+| SQLHealthMonitor - Daily Report | Daily 7:00 AM | Sends daily health summary |
+| SQLHealthMonitor - Weekly Report | Monday 8:00 AM | Sends weekly deep dive |
+| SQLHealthMonitor - Alert Check | Every 5 min | Evaluates thresholds, sends alerts |
 
-## Compatibility
+## Deployment Notes
 
-- ✅ SQL Server 2016, 2017, 2019, 2022
-- ✅ Standard & Enterprise Edition
-- ✅ AlwaysOn AG environments
-- ✅ Standalone instances
-- ✅ Multi-instance servers
-- ⚠️ Azure SQL MI (partial — no SQL Agent, use external scheduler)
-- ❌ Azure SQL DB (not supported)
+### DataBank Environment
+
+```powershell
+# Production deployment
+Install-SQLHealthMonitor -ServerInstance 'DFW3PRDBCSSQL03' `
+    -Schedule Hourly `
+    -EmailProfile 'DataBank DBA' `
+    -Recipients 'dba-team@databank.com','travis@databank.com' `
+    -Language EN
+
+# Dev/staging (no agent jobs, manual testing)
+Install-SQLHealthMonitor -ServerInstance 'DBDEV' -SkipAgentJobs -Language EN
+```
+
+### Multi-Instance Deployment
+
+```powershell
+$servers = @('DBPRD', 'DBSTG', 'DBAPP')
+$servers | ForEach-Object {
+    Install-SQLHealthMonitor -ServerInstance $_ -EmailProfile 'DBA Mail' -Recipients 'team@company.com'
+}
+```
+
+## Customization
+
+### Adding a New Collector
+
+1. Create `collectors/collect_your_metric.sql`
+2. Add the collector name to `powershell/config/default.json` → `Collectors.Enabled`
+3. Add the mapping in `Invoke-SQLHealthMonitor.ps1` → `$collectorSequence`
+
+### Custom Thresholds
+
+Edit `alerts/thresholds_default.sql` or insert directly into the `AlertThresholds` table.
+
+### Custom Report Templates
+
+Create new templates in `reports/templates/` following the naming convention: `{type}_{language}.html`
 
 ## License
 
@@ -189,4 +194,4 @@ MIT
 
 ## Author
 
-Lucas Borges — Senior DBA / Database Engineer
+Lucas Allan Borges — Senior DBA / Database Engineer
