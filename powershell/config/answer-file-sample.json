@@ -1,0 +1,78 @@
+{
+  "InstallMode": "SingleInstance",
+  "Connection": {
+    "ServerInstance": "SQL-PRD-01",
+    "AuthMethod": "Windows",
+    "Database": "DBA_Monitor"
+  },
+  "MultiInstance": {
+    "Instances": [
+      {
+        "InstanceName": "SQL-PRD-01",
+        "DisplayName": "Production Primary",
+        "Environment": "PRD",
+        "Role": "OLTP"
+      },
+      {
+        "InstanceName": "SQL-PRD-02",
+        "DisplayName": "Production Secondary",
+        "Environment": "PRD",
+        "Role": "REPORTING"
+      }
+    ]
+  },
+  "Collectors": {
+    "EnableAll": true,
+    "Disabled": []
+  },
+  "Alerts": {
+    "Enabled": true,
+    "UseDefaults": true,
+    "Recipients": ["dba@company.com"],
+    "CustomThresholds": {
+      "CPU_Warning": 80,
+      "CPU_Critical": 95,
+      "Disk_Warning": 85,
+      "Disk_Critical": 95,
+      "PLE_Warning": 300,
+      "PLE_Critical": 100,
+      "Blocking_Seconds": 30
+    }
+  },
+  "Reports": {
+    "DailyEnabled": true,
+    "WeeklyEnabled": true,
+    "Recipients": ["dba@company.com", "manager@company.com"],
+    "Language": "EN",
+    "DailyTime": "07:00",
+    "WeeklyDay": "Monday",
+    "WeeklyTime": "08:00"
+  },
+  "Email": {
+    "Method": "DatabaseMail",
+    "ProfileName": "DBA Mail",
+    "SMTP": {
+      "Server": "smtp.company.com",
+      "Port": 587,
+      "UseSSL": true,
+      "Username": "alerts@company.com"
+    }
+  },
+  "Scheduling": {
+    "CreateAgentJobs": true,
+    "CollectionInterval": "15min",
+    "AlertInterval": "5min"
+  },
+  "Baselines": {
+    "Enabled": true,
+    "CaptureNow": false
+  },
+  "Retention": {
+    "UseDefaults": true,
+    "RawDataDays": 30,
+    "DailySummaryDays": 90,
+    "WeeklySummaryDays": 365,
+    "AlertHistoryDays": 365,
+    "AnomalyDays": 90
+  }
+}
