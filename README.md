@@ -46,7 +46,7 @@ sql-health-monitor/
 │   └── update_baselines.sql          # Legacy baseline update
 ├── multi-instance/          # CMS multi-instance support
 │   ├── cms_tables.sql                # RegisteredServers + health snapshot tables
-│   ├── register_databank.sql         # DataBank environment registration
+│   ├── register_sample.sql            # Sample instance registration
 │   ├── collect_all_instances.sql     # Cross-instance collection wrapper
 │   └── compare_instances.sql         # Health comparison + drift detection
 ├── config/                  # Database configuration scripts
@@ -117,13 +117,13 @@ Invoke-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -RunType Alert
 
 ```powershell
 # Collect from all registered production instances
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances -Environment PRD
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType Collection -AllInstances -Environment PRD
 
 # Collect from ALL registered instances
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType Collection -AllInstances
 
 # Daily report for all instances
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType DailyReport -AllInstances -Language EN
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType DailyReport -AllInstances -Language EN
 ```
 
 ### 5. Baseline Management
@@ -258,7 +258,7 @@ Monitor multiple SQL Server instances from a central management server.
 -- Run: multi-instance/cms_tables.sql
 
 -- 2. Register your instances
--- Run: multi-instance/register_databank.sql (or add your own)
+-- Run: multi-instance/register_sample.sql (customize for your environment)
 
 -- 3. Collect from all instances (T-SQL via linked servers)
 EXEC [monitor].[usp_CollectAllInstances] @Environment = 'PRD';
@@ -271,10 +271,10 @@ EXEC [monitor].[usp_CompareInstances] @Environment = 'PRD';
 
 ```powershell
 # Collect from all registered servers (no linked servers needed)
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType Collection -AllInstances
 
 # Production only
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances -Environment PRD
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType Collection -AllInstances -Environment PRD
 ```
 
 ### Drift Detection
@@ -308,31 +308,31 @@ Edit `powershell/config/default.json` to customize:
 
 ## Deployment Notes
 
-### DataBank Environment
+### Single Instance
 
 ```powershell
-# Production deployment
-Install-SQLHealthMonitor -ServerInstance 'DFW3PRDBCSSQL03' `
+# Production deployment with Agent jobs
+Install-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' `
     -Schedule Hourly `
-    -EmailProfile 'DataBank DBA' `
-    -Recipients 'dba-team@databank.com','travis@databank.com' `
+    -EmailProfile 'DBA Mail' `
+    -Recipients 'dba-team@company.com' `
     -Language EN
 
 # Dev/staging (no agent jobs, manual testing)
-Install-SQLHealthMonitor -ServerInstance 'DBDEV' -SkipAgentJobs -Language EN
+Install-SQLHealthMonitor -ServerInstance 'SQL-DEV-01' -SkipAgentJobs -Language EN
 ```
 
 ### Multi-Instance Deployment
 
 ```powershell
-# Deploy to all registered instances
-$servers = @('DBPRD', 'DBSTG', 'DBAPP', 'DFW3PRDBCSSQL01', 'DFW3PRDBCSSQL03', 'DFW3PRDBCSSQL04', 'DFW3PRDBCSSQL05')
+# Deploy to multiple instances
+$servers = @('SQL-PRD-01', 'SQL-PRD-02', 'SQL-STG-01', 'SQL-ETL-01')
 $servers | ForEach-Object {
     Install-SQLHealthMonitor -ServerInstance $_ -EmailProfile 'DBA Mail' -Recipients 'team@company.com'
 }
 
-# Or use multi-instance collection from CMS
-Invoke-SQLHealthMonitor -ServerInstance 'DBPRD' -RunType Collection -AllInstances
+# Or use multi-instance collection from a central CMS
+Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType Collection -AllInstances
 ```
 
 ## Customization
