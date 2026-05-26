@@ -21,14 +21,16 @@ Proactive SQL Server health monitoring, alerting, and reporting solution. Design
 ```
 sql-health-monitor/
 ├── powershell/              # PowerShell orchestration layer
-│   ├── Invoke-SQLHealthMonitor.ps1   # Main orchestrator (single + multi-instance)
-│   ├── Send-HealthReport.ps1         # Report generator/sender
-│   ├── Install-SQLHealthMonitor.ps1  # Automated installer
-│   ├── Deploy-SqlHealthMonitor.ps1   # Deployment helper
-│   ├── Test-Installation.ps1         # Post-install validation
-│   ├── SQLHealthMonitor.psd1         # Module manifest
+│   ├── Start-SQLHealthMonitorSetup.ps1  # Interactive onboarding wizard
+│   ├── Invoke-SQLHealthMonitor.ps1      # Main orchestrator (single + multi-instance)
+│   ├── Send-HealthReport.ps1            # Report generator/sender
+│   ├── Install-SQLHealthMonitor.ps1     # Automated installer (non-interactive)
+│   ├── Deploy-SqlHealthMonitor.ps1      # Deployment helper
+│   ├── Test-Installation.ps1            # Post-install validation
+│   ├── SQLHealthMonitor.psd1            # Module manifest
 │   └── config/
-│       └── default.json              # Default configuration
+│       ├── default.json                 # Default configuration
+│       └── answer-file-sample.json      # Sample answers for non-interactive mode
 ├── collectors/              # T-SQL collection scripts (16 collectors)
 ├── alerts/                  # Alert engine, thresholds, and actions
 ├── baselines/               # Baseline engine
@@ -76,13 +78,39 @@ sql-health-monitor/
 
 ## Quick Start
 
-### 1. Install dbatools (if not already installed)
+### Interactive Setup (Recommended)
+
+The easiest way to get started. The wizard walks you through every configuration step:
 
 ```powershell
+# 1. Install dbatools (if not already installed)
 Install-Module dbatools -Scope CurrentUser -Force
+
+# 2. Run the interactive setup wizard
+.\powershell\Start-SQLHealthMonitorSetup.ps1
 ```
 
-### 2. Deploy the solution
+The wizard will guide you through:
+- Connection setup (with live validation)
+- Single or multi-instance mode
+- Collector selection (auto-detects AG/CDC)
+- Alert thresholds and recipients
+- Report schedule and language (EN / PT-BR)
+- Email configuration (Database Mail or SMTP)
+- SQL Agent job creation
+- Baseline engine setup
+- Data retention policies
+
+At the end, your answers are exported to a JSON file so you can replicate the same setup on other servers:
+
+```powershell
+# Non-interactive install using a saved answer file
+.\powershell\Start-SQLHealthMonitorSetup.ps1 -NonInteractive -AnswerFile .\config\my-answers.json
+```
+
+### Manual Setup
+
+If you prefer to configure everything manually:
 
 ```powershell
 Import-Module .\powershell\SQLHealthMonitor.psd1
@@ -97,7 +125,7 @@ Install-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' `
 Install-SQLHealthMonitor -ServerInstance 'YOUR_SERVER' -SkipAgentJobs
 ```
 
-### 3. Run manually
+### Running Manually
 
 ```powershell
 # Collect metrics
