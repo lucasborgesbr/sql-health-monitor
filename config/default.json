@@ -1,0 +1,85 @@
+{
+  "General": {
+    "Language": "PT-BR",
+    "LogLevel": "INFO",
+    "RetentionDays": 90,
+    "DataCollectionInterval": 300,
+    "EnableDebugMode": false
+  },
+  "Alerts": {
+    "CPUThreshold": 85,
+    "MemoryThreshold": 90,
+    "DiskThreshold": 80,
+    "LogFullThreshold": 95,
+    "SlowQueryThreshold": 3,
+    "BlockingThreshold": 30,
+    "DeadlockThreshold": 1,
+    "AGSyncThreshold": 30,
+    "CDCRetentionThreshold": 7,
+    "BackupThreshold": 24,
+    "JobFailureThreshold": 1,
+    "TempDBThreshold": 80,
+    "FragmentationThreshold": 30,
+    "StatisticsUpdateThreshold": 10
+  },
+  "Reports": {
+    "DailyTime": "06:00",
+    "WeeklyDay": "Monday",
+    "WeeklyTime": "06:00",
+    "MonthlyDay": 1,
+    "MonthlyTime": "06:00",
+    "ReportRetentionDays": 365
+  },
+  "Email": {
+    "Recipients": ["dba@yourcompany.com"],
+    "From": "sqlmonitor@yourcompany.com",
+    "Server": "mail.yourcompany.com",
+    "Port": 25,
+    "UseSSL": false,
+    "IncludeCharts": true,
+    "ChartType": "sparkline",
+    "MaxEmailSize": 10485760
+  },
+  "Analytics": {
+    "WaitStatsInterval": 300,
+    "TopQueriesCount": 10,
+    "TopJobsCount": 10,
+    "HistoryDays": 30,
+    "TrendAnalysis": true,
+    "CorrelationAnalysis": true
+  },
+  "Optimization": {
+    "MaintenanceWindow": "02:00-04:00",
+    "AutoUpdateStatistics": true,
+    "AutoDefragmentIndexes": false,
+    "AutoCleanup": true,
+    "RecommendationReviewDays": 7
+  },
+  "DisasterRecovery": {
+    "MonthlySnapshotDay": 1,
+    "MonthlySnapshotTime": "06:00",
+    "DailyChecklist": true,
+    "TrendAnalysis": true,
+    "RetentionDays": 365
+  },
+  "Security": {
+    "EncryptData": true,
+    "AuditLog": true,
+    "AccessControl": true,
+    "DataMasking": false
+  },
+  "Performance": {
+    "MaxConcurrentJobs": 5,
+    "QueryTimeout": 300,
+    "CommandTimeout": 600,
+    "ConnectionTimeout": 30,
+    "BatchSize": 1000
+  },
+  "Storage": {
+    "DataFileLocation": "C:\\SQLHealthMonitor\\Data",
+    "LogFileLocation": "C:\\SQLHealthMonitor\\Logs",
+    "BackupLocation": "C:\\SQLHealthMonitor\\Backups",
+    "MaxDataFileSize": 1073741824,
+    "MaxLogFileSize": 104857600
+  }
+}
