@@ -1,391 +1,407 @@
--- =================================================================================
 -- SQL Health Monitor - Database Migration Script
--- Script: migrate_db_name.sql
--- Purpose: Rename database from "DBA_Monitor" to "SQLHealthMonitor"
--- Author: Lucas Allan Borges
--- Version: 1.0.0
--- Date: 2026-05-31
--- =================================================================================
+-- Migrates existing databases from "DBA_Monitor" to "SQLHealthMonitor"
+-- 
+-- WARNING: This script will rename your database and update all references
+-- Make sure you have a backup before running this script
+-- 
+-- Usage: 
+-- 1. Backup your database first
+-- 2. Run this script in the context of the database to be migrated
+-- 3. Run the validation script to confirm migration success
 
--- =================================================================================
--- CONFIGURATION SECTION
--- =================================================================================
+USE master;
+GO
 
--- Set database names
-DECLARE @OldDatabaseName NVARCHAR(128) = 'DBA_Monitor';
-DECLARE @NewDatabaseName NVARCHAR(128) = 'SQLHealthMonitor';
-DECLARE @BackupPath NVARCHAR(512) = 'C:\SQLHealthMonitor\Backups\';
-DECLARE @LogPath NVARCHAR(512) = 'C:\SQLHealthMonitor\MigrationLogs\';
+-- =============================================
+-- STEP 1: PRE-MIGRATION VALIDATION
+-- =============================================
 
--- Set validation flags
-DECLARE @ValidateBackup BIT = 1;
-DECLARE @ValidateDataIntegrity BIT = 1;
-DECLARE @ValidateObjects BIT = 1;
-DECLARE @GenerateRollbackScript BIT = 1;
+PRINT '=== SQL Health Monitor Database Migration ===';
+PRINT 'Starting migration from DBA_Monitor to SQLHealthMonitor';
+PRINT '==============================================';
 
--- =================================================================================
--- PRE-MIGRATION VALIDATION
--- =================================================================================
-
-PRINT '=== PRE-MIGRATION VALIDATION ===';
-
--- Check if old database exists
-IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = @OldDatabaseName)
+-- Check if source database exists
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'DBA_Monitor')
 BEGIN
-    PRINT 'ERROR: Database ' + @OldDatabaseName + ' does not exist.';
-    THROW 50001, 'Source database does not exist.', 1;
+    PRINT 'ERROR: Source database DBA_Monitor does not exist.';
+    PRINT 'Migration aborted.';
+    RETURN;
 END
-PRINT '✓ Source database ' + @OldDatabaseName + ' exists.';
 
--- Check if new database already exists
-IF EXISTS (SELECT 1 FROM sys.databases WHERE name = @NewDatabaseName)
+-- Check if target database already exists
+IF EXISTS (SELECT 1 FROM sys.databases WHERE name = 'SQLHealthMonitor')
 BEGIN
-    PRINT 'ERROR: Database ' + @NewDatabaseName + ' already exists.';
-    THROW 50002, 'Target database already exists.', 1;
+    PRINT 'ERROR: Target database SQLHealthMonitor already exists.';
+    PRINT 'Please drop the target database first or choose a different name.';
+    PRINT 'Migration aborted.';
+    RETURN;
 END
-PRINT '✓ Target database ' + @NewDatabaseName + ' does not exist.';
 
--- Check if backup directory exists
-IF NOT EXISTS (SELECT 1 FROM sys.database_files WHERE type = 3) -- Check if FILESTREAM is available
+-- Check if there are active connections to the source database
+DECLARE @connection_count INT;
+SELECT @connection_count = COUNT(*) 
+FROM sys.dm_exec_sessions s
+JOIN sys.dm_exec_connections c ON s.session_id = c.session_id
+WHERE s.database_id = DB_ID('DBA_Monitor');
+
+IF @connection_count > 0
 BEGIN
+    PRINT 'WARNING: There are ' + CAST(@connection_count AS VARCHAR(10)) + ' active connections to DBA_Monitor.';
+    PRINT 'Please disconnect all applications before proceeding.';
+    PRINT 'Migration aborted.';
+    RETURN;
+END
+
+-- =============================================
+-- STEP 2: CREATE BACKUP
+-- =============================================
+
+PRINT 'Creating backup of DBA_Monitor...';
+
+BEGIN TRY
     -- Create backup directory if it doesn't exist
-    DECLARE @CreateBackupDir NVARCHAR(1000) = 
-        'EXEC xp_cmdshell ''mkdir "' + @BackupPath + '"''';
-    BEGIN TRY
-        EXEC sp_executesql @CreateBackupDir;
-        PRINT '✓ Backup directory created: ' + @BackupPath;
-    END TRY
-    BEGIN CATCH
-        PRINT 'WARNING: Could not create backup directory. Using default location.';
-        SET @BackupPath = 'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Backup\';
-    END CATCH
-END
-ELSE
-BEGIN
-    PRINT '✓ Backup directory exists: ' + @BackupPath;
-END
-
--- Check if log directory exists
-DECLARE @CreateLogDir NVARCHAR(1000) = 
-    'EXEC xp_cmdshell ''mkdir "' + @LogPath + '"''';
-BEGIN TRY
-    EXEC sp_executesql @CreateLogDir;
-    PRINT '✓ Log directory created: ' + @LogPath;
-END TRY
-    BEGIN CATCH
-    PRINT 'WARNING: Could not create log directory. Using default location.';
-    SET @LogPath = 'C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Log\';
-END CATCH
-
--- =================================================================================
--- STEP 1: CREATE BACKUP OF EXISTING DATABASE
--- =================================================================================
-
-PRINT '';
-PRINT '=== STEP 1: CREATING DATABASE BACKUP ===';
-
-DECLARE @BackupFile NVARCHAR(512) = @BackupPath + @OldDatabaseName + '_' + 
-    CONVERT(NVARCHAR(20), GETDATE(), 112) + '_' + 
-    REPLACE(CONVERT(NVARCHAR(20), GETDATE(), 108), ':', '') + '.bak';
-
-DECLARE @BackupCommand NVARCHAR(1000) = 
-    'BACKUP DATABASE [' + @OldDatabaseName + '] TO DISK = ''' + @BackupFile + ''' 
-     WITH NAME = ''Pre-migration backup'', 
-          DESCRIPTION = ''Backup before renaming database to ' + @NewDatabaseName + ''',
-          COMPRESSION, 
-          CHECKSUM, 
-          STATS = 10, 
-          INIT, 
-          SKIP, 
-          NOREWIND, 
-          NOUNLOAD;';
-
-BEGIN TRY
-    EXEC sp_executesql @BackupCommand;
-    PRINT '✓ Database backup created successfully: ' + @BackupFile;
+    DECLARE @backup_dir NVARCHAR(255);
+    DECLARE @backup_path NVARCHAR(500);
+    DECLARE @sql NVARCHAR(MAX);
     
-    -- Validate backup
-    IF @ValidateBackup = 1
+    SET @backup_dir = 'C:\SQL_Backups\SQLHealthMonitor\';
+    
+    -- Create directory
+    SET @sql = 'IF NOT EXISTS (SELECT 1 FROM sys.database_files WHERE name = ''tempdb'') 
+                EXEC master.dbo.xp_create_subdir ''' + @backup_dir + ''';';
+    EXEC sp_executesql @sql;
+    
+    -- Set backup path
+    SET @backup_path = @backup_dir + 'DBA_Monitor_' + 
+                      REPLACE(CONVERT(VARCHAR, GETDATE(), 120), ':', '') + '.bak';
+    
+    -- Create backup
+    BACKUP DATABASE [DBA_Monitor] 
+    TO DISK = @backup_path
+    WITH 
+        NAME = 'DBA_Monitor_Full_Backup',
+        DESCRIPTION = 'Full backup before migration to SQLHealthMonitor',
+        COMPRESSION,
+        STATS = 10,
+        CHECKSUM,
+        INIT;
+    
+    PRINT 'Backup created successfully at: ' + @backup_path;
+    
+    -- Store backup path in a table for reference
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'migration_log')
     BEGIN
-        DECLARE @ValidateBackupCmd NVARCHAR(1000) = 
-            'RESTORE VERIFYONLY FROM DISK = ''' + @BackupFile + ''';';
-        EXEC sp_executesql @ValidateBackupCmd;
-        PRINT '✓ Backup validation completed successfully.';
+        CREATE TABLE migration_log (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            migration_date DATETIME DEFAULT GETDATE(),
+            operation NVARCHAR(100),
+            details NVARCHAR(MAX),
+            status NVARCHAR(20) DEFAULT 'SUCCESS'
+        );
     END
+    
+    INSERT INTO migration_log (operation, details)
+    VALUES ('BACKUP', 'Full backup created at ' + @backup_path);
+    
 END TRY
 BEGIN CATCH
-    PRINT 'ERROR: Failed to create database backup.';
-    PRINT 'Error: ' + ERROR_MESSAGE();
-    THROW 50003, 'Backup creation failed.', 1;
+    PRINT 'ERROR: Failed to create backup.';
+    PRINT 'Error message: ' + ERROR_MESSAGE();
+    PRINT 'Migration aborted.';
+    RETURN;
 END CATCH;
+GO
 
--- =================================================================================
--- STEP 2: CREATE ROLLBACK SCRIPT
--- =================================================================================
-
-PRINT '';
-PRINT '=== STEP 2: CREATING ROLLBACK SCRIPT ===';
-
-IF @GenerateRollbackScript = 1
-BEGIN
-    DECLARE @RollbackScript NVARCHAR(MAX) = 
-        '-- =================================================================================' + CHAR(13) + CHAR(10) +
-        '-- ROLLBACK SCRIPT - Database Migration' + CHAR(13) + CHAR(10) +
-        '-- Generated: ' + CONVERT(NVARCHAR(20), GETDATE(), 120) + CHAR(13) + CHAR(10) +
-        '-- Original Database: ' + @OldDatabaseName + CHAR(13) + CHAR(10) +
-        '-- New Database: ' + @NewDatabaseName + CHAR(13) + CHAR(10) +
-        '-- =================================================================================' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-        '-- Check if new database exists and drop it' + CHAR(13) + CHAR(10) +
-        'IF EXISTS (SELECT 1 FROM sys.databases WHERE name = ''' + @NewDatabaseName + ''')' + CHAR(13) + CHAR(10) +
-        'BEGIN' + CHAR(13) + CHAR(10) +
-        '    USE [master];' + CHAR(13) + CHAR(10) +
-        '    ALTER DATABASE [' + @NewDatabaseName + '] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;' + CHAR(13) + CHAR(10) +
-        '    DROP DATABASE [' + @NewDatabaseName + '];' + CHAR(13) + CHAR(10) +
-        '    PRINT ''Dropped database ' + @NewDatabaseName + ' for rollback.';' + CHAR(13) + CHAR(10) +
-        'END' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-        '-- Restore from backup' + CHAR(13) + CHAR(10) +
-        'RESTORE DATABASE [' + @OldDatabaseName + '] FROM DISK = ''' + @BackupFile + ''' ' + CHAR(13) + CHAR(10) +
-        'WITH MOVE ''' + @OldDatabaseName + ''' TO ''C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Data\' + @OldDatabaseName + '.mdf',' + CHAR(13) + CHAR(10) +
-        '     MOVE ''' + @OldDatabaseName + '_log'' TO ''C:\Program Files\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQL\Data\' + @OldDatabaseName + '_log.ldf',' + CHAR(13) + CHAR(10) +
-        '     REPLACE, RECOVERY;' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-        '-- Restore original database state' + CHAR(13) + CHAR(10) +
-        'PRINT ''Database rollback completed. Database name restored to ' + @OldDatabaseName + '.'''';
-
-    DECLARE @RollbackFile NVARCHAR(512) = @LogPath + 'Rollback_' + 
-        CONVERT(NVARCHAR(20), GETDATE(), 112) + '_' + 
-        REPLACE(CONVERT(NVARCHAR(20), GETDATE(), 108), ':', '') + '.sql';
-
-    DECLARE @WriteRollbackCmd NVARCHAR(1000) = 
-        'EXEC xp_cmdshell ''echo "' + REPLACE(@RollbackScript, '"', '""') + '" > "' + @RollbackFile + '"''';
-
-    BEGIN TRY
-        EXEC sp_executesql @WriteRollbackCmd;
-        PRINT '✓ Rollback script created: ' + @RollbackFile;
-    END TRY
-    BEGIN CATCH
-        PRINT 'WARNING: Could not create rollback script file. Script content logged below:';
-        PRINT @RollbackScript;
-    END CATCH
-END
-
--- =================================================================================
+-- =============================================
 -- STEP 3: RENAME DATABASE
--- =================================================================================
+-- =============================================
 
-PRINT '';
-PRINT '=== STEP 3: RENAMING DATABASE ===';
+PRINT 'Renaming database from DBA_Monitor to SQLHealthMonitor...';
 
--- Set database to single user mode
 BEGIN TRY
-    DECLARE @SingleUserCmd NVARCHAR(500) = 
-        'ALTER DATABASE [' + @OldDatabaseName + '] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;';
-    EXEC sp_executesql @SingleUserCmd;
-    PRINT '✓ Database set to single user mode.';
-END TRY
-BEGIN CATCH
-    PRINT 'ERROR: Failed to set database to single user mode.';
-    PRINT 'Error: ' + ERROR_MESSAGE();
-    THROW 50004, 'Failed to set database to single user mode.', 1;
-END CATCH
-
--- Rename database
-BEGIN TRY
-    DECLARE @RenameCmd NVARCHAR(500) = 
-        'ALTER DATABASE [' + @OldDatabaseName + '] MODIFY NAME = [' + @NewDatabaseName + '];';
-    EXEC sp_executesql @RenameCmd;
-    PRINT '✓ Database renamed from ' + @OldDatabaseName + ' to ' + @NewDatabaseName + '.';
+    -- Set database to single user mode to force disconnect all connections
+    ALTER DATABASE [DBA_Monitor] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    
+    -- Rename database
+    ALTER DATABASE [DBA_Monitor] MODIFY NAME = [SQLHealthMonitor];
+    
+    -- Set database back to multi user mode
+    ALTER DATABASE [SQLHealthMonitor] SET MULTI_USER;
+    
+    -- Log the operation
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'migration_log')
+    BEGIN
+        INSERT INTO migration_log (operation, details)
+        VALUES ('RENAME', 'Database renamed from DBA_Monitor to SQLHealthMonitor');
+    END
+    
+    PRINT 'Database renamed successfully to SQLHealthMonitor';
+    
 END TRY
 BEGIN CATCH
     PRINT 'ERROR: Failed to rename database.';
-    PRINT 'Error: ' + ERROR_MESSAGE();
+    PRINT 'Error message: ' + ERROR_MESSAGE();
     
-    -- Attempt to restore to multi-user mode
+    -- Attempt rollback
     BEGIN TRY
-        DECLARE @RestoreMultiUserCmd NVARCHAR(500) = 
-            'ALTER DATABASE [' + @OldDatabaseName + '] SET MULTI_USER;';
-        EXEC sp_executesql @RestoreMultiUserCmd;
-        PRINT 'Database restored to multi-user mode.';
+        PRINT 'Attempting rollback...';
+        ALTER DATABASE [DBA_Monitor] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+        ALTER DATABASE [DBA_Monitor] SET MULTI_USER;
+        PRINT 'Rollback completed.';
     END TRY
     BEGIN CATCH
-        PRINT 'ERROR: Failed to restore database to multi-user mode.';
-        PRINT 'Error: ' + ERROR_MESSAGE();
+        PRINT 'ERROR: Failed to complete rollback.';
+        PRINT 'Error message: ' + ERROR_MESSAGE();
     END CATCH
     
-    THROW 50005, 'Failed to rename database.', 1;
-END CATCH
+    RETURN;
+END CATCH;
+GO
 
--- Set database back to multi-user mode
-BEGIN TRY
-    DECLARE @MultiUserCmd NVARCHAR(500) = 
-        'ALTER DATABASE [' + @NewDatabaseName + '] SET MULTI_USER;';
-    EXEC sp_executesql @MultiUserCmd;
-    PRINT '✓ Database set back to multi user mode.';
-END TRY
-BEGIN CATCH
-    PRINT 'WARNING: Failed to set database to multi-user mode.';
-    PRINT 'Error: ' + ERROR_MESSAGE();
-END CATCH
+-- =============================================
+-- STEP 4: UPDATE INTERNAL REFERENCES
+-- =============================================
 
--- =================================================================================
--- STEP 4: UPDATE CONFIGURATION FILES
--- =================================================================================
+PRINT 'Updating internal references...';
 
-PRINT '';
-PRINT '=== STEP 4: UPDATING CONFIGURATION FILES ===';
-
--- Update configuration file
-DECLARE @ConfigFile NVARCHAR(512) = @LogPath + 'updated-config-' + 
-    CONVERT(NVARCHAR(20), GETDATE(), 112) + '.json';
-
-DECLARE @ConfigContent NVARCHAR(MAX) = 
-    '{' + CHAR(13) + CHAR(10) +
-    '  "InstallMode": "SingleInstance",' + CHAR(13) + CHAR(10) +
-    '  "Connection": {' + CHAR(13) + CHAR(10) +
-    '    "ServerInstance": "SQL-PRD-01",' + CHAR(13) + CHAR(10) +
-    '    "AuthMethod": "Windows",' + CHAR(13) + Char(10) +
-    '    "Database": "' + @NewDatabaseName + '"' + CHAR(13) + Char(10) +
-    '  },' + CHAR(13) + Char(10) +
-    '  "MigratedFrom": "' + @OldDatabaseName + '",' + CHAR(13) + Char(10) +
-    '  "MigrationDate": "' + CONVERT(NVARCHAR(20), GETDATE(), 120) + '",' + CHAR(13) + Char(10) +
-    '  "MigrationBackup": "' + @BackupFile + '"' + CHAR(13) + Char(10) +
-    '}';
-
-DECLARE @WriteConfigCmd NVARCHAR(1000) = 
-    'EXEC xp_cmdshell ''echo "' + REPLACE(@ConfigContent, '"', '""') + '" > "' + @ConfigFile + '"''';
+USE [SQLHealthMonitor];
+GO
 
 BEGIN TRY
-    EXEC sp_executesql @WriteConfigCmd;
-    PRINT '✓ Updated configuration file created: ' + @ConfigFile;
+    -- Update stored procedures that might have hardcoded references
+    DECLARE @sql NVARCHAR(MAX);
+    
+    -- Update any references in stored procedures
+    DECLARE @proc_name NVARCHAR(128);
+    DECLARE @proc_def NVARCHAR(MAX);
+    DECLARE proc_cursor CURSOR FOR
+    SELECT name, OBJECT_DEFINITION(object_id)
+    FROM sys.procedures
+    WHERE OBJECT_DEFINITION(object_id) LIKE '%DBA_Monitor%';
+    
+    OPEN proc_cursor;
+    FETCH NEXT FROM proc_cursor INTO @proc_name, @proc_def;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @sql = REPLACE(@proc_def, 'DBA_Monitor', 'SQLHealthMonitor');
+        EXEC sp_executesql N'ALTER PROCEDURE [' + @proc_name + '] AS ' + @sql;
+        
+        FETCH NEXT FROM proc_cursor INTO @proc_name, @proc_def;
+    END
+    
+    CLOSE proc_cursor;
+    DEALLOCATE proc_cursor;
+    
+    -- Update views
+    DECLARE view_cursor CURSOR FOR
+    SELECT name, OBJECT_DEFINITION(object_id)
+    FROM sys.views
+    WHERE OBJECT_DEFINITION(object_id) LIKE '%DBA_Monitor%';
+    
+    OPEN view_cursor;
+    FETCH NEXT FROM view_cursor INTO @proc_name, @proc_def;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @sql = REPLACE(@proc_def, 'DBA_Monitor', 'SQLHealthMonitor');
+        EXEC sp_executesql N'ALTER VIEW [' + @proc_name + '] AS ' + @sql;
+        
+        FETCH NEXT FROM view_cursor INTO @proc_name, @proc_def;
+    END
+    
+    CLOSE view_cursor;
+    DEALLOCATE view_cursor;
+    
+    -- Update functions
+    DECLARE func_cursor CURSOR FOR
+    SELECT name, OBJECT_DEFINITION(object_id)
+    FROM sys.objects
+    WHERE type IN ('FN', 'IF', 'TF')
+    AND OBJECT_DEFINITION(object_id) LIKE '%DBA_Monitor%';
+    
+    OPEN func_cursor;
+    FETCH NEXT FROM func_cursor INTO @proc_name, @proc_def;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @sql = REPLACE(@proc_def, 'DBA_Monitor', 'SQLHealthMonitor');
+        EXEC sp_executesql N'ALTER FUNCTION [' + @proc_name + '] ' + @sql;
+        
+        FETCH NEXT FROM func_cursor INTO @proc_name, @proc_def;
+    END
+    
+    CLOSE func_cursor;
+    DEALLOCATE func_cursor;
+    
+    -- Log the operation
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'migration_log')
+    BEGIN
+        INSERT INTO migration_log (operation, details)
+        VALUES ('UPDATE_REFERENCES', 'Updated all internal references from DBA_Monitor to SQLHealthMonitor');
+    END
+    
+    PRINT 'Internal references updated successfully';
+    
 END TRY
 BEGIN CATCH
-    PRINT 'WARNING: Could not create updated configuration file.';
-    PRINT 'Configuration content logged below:';
-    PRINT @ConfigContent;
-END CATCH
+    PRINT 'ERROR: Failed to update internal references.';
+    PRINT 'Error message: ' + ERROR_MESSAGE();
+    RETURN;
+END CATCH;
+GO
 
--- =================================================================================
--- STEP 5: VALIDATION
--- =================================================================================
+-- =============================================
+-- STEP 5: POST-MIGRATION VALIDATION
+-- =============================================
 
-PRINT '';
-PRINT '=== STEP 5: VALIDATION ===';
+PRINT 'Running post-migration validation...';
 
--- Validate database exists with new name
-IF EXISTS (SELECT 1 FROM sys.databases WHERE name = @NewDatabaseName)
-BEGIN
-    PRINT '✓ Database ' + @NewDatabaseName + ' exists.';
-END
-ELSE
-BEGIN
-    PRINT 'ERROR: Database ' + @NewDatabaseName + ' does not exist.';
-    THROW 50006, 'Database rename validation failed.', 1;
-END
+USE [SQLHealthMonitor];
+GO
 
--- Validate old database no longer exists
-IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = @OldDatabaseName)
-BEGIN
-    PRINT '✓ Old database ' + @OldDatabaseName + ' no longer exists.';
-END
-ELSE
-BEGIN
-    PRINT 'ERROR: Old database ' + @OldDatabaseName + ' still exists.';
-    THROW 50007, 'Database cleanup validation failed.', 1;
-END
-
--- Validate data integrity
-IF @ValidateDataIntegrity = 1
-BEGIN
-    PRINT 'Performing data integrity checks...';
+BEGIN TRY
+    -- Check if all expected tables exist
+    DECLARE @missing_tables TABLE (table_name NVARCHAR(128));
     
-    -- Check database consistency
-    DECLARE @CheckDBCmd NVARCHAR(500) = 'DBCC CHECKDB ([' + @NewDatabaseName + ']) WITH NO_INFOMSGS, ALL_ERRORMSGS;';
-    BEGIN TRY
-        EXEC sp_executesql @CheckDBCmd;
-        PRINT '✓ Database consistency check passed.';
-    END TRY
-    BEGIN CATCH
-        PRINT 'WARNING: Database consistency check failed.';
-        PRINT 'Error: ' + ERROR_MESSAGE();
-    END CATCH
+    INSERT INTO @missing_tables (table_name)
+    SELECT 'monitor.Metrics' WHERE NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Metrics' AND schema_id = SCHEMA_ID('monitor'));
     
-    -- Check table counts
-    DECLARE @TableCountCmd NVARCHAR(500) = 
-        'SELECT COUNT(*) AS TableCount FROM [' + @NewDatabaseName + '].sys.tables;';
-    DECLARE @TableCount INT;
-    EXEC sp_executesql @TableCountCmd, N'@TableCount INT OUTPUT', @TableCount = @TableCount OUTPUT;
+    INSERT INTO @missing_tables (table_name)
+    SELECT 'monitor.Thresholds' WHERE NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Thresholds' AND schema_id = SCHEMA_ID('monitor'));
     
-    IF @TableCount > 0
+    INSERT INTO @missing_tables (table_name)
+    SELECT 'monitor.AlertHistory' WHERE NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AlertHistory' AND schema_id = SCHEMA_ID('monitor'));
+    
+    INSERT INTO @missing_tables (table_name)
+    SELECT 'monitor.Collectors' WHERE NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Collectors' AND schema_id = SCHEMA_ID('monitor'));
+    
+    IF EXISTS (SELECT 1 FROM @missing_tables)
     BEGIN
-        PRINT '✓ Database contains ' + CAST(@TableCount AS NVARCHAR(10)) + ' tables.';
+        PRINT 'WARNING: Some expected tables are missing:';
+        SELECT table_name FROM @missing_tables;
     END
     ELSE
     BEGIN
-        PRINT 'WARNING: Database contains no tables.';
+        PRINT 'All expected tables found successfully';
     END
-END
-
--- Validate objects
-IF @ValidateObjects = 1
-BEGIN
-    PRINT 'Validating database objects...';
     
-    -- Check for stored procedures
-    DECLARE @ProcCountCmd NVARCHAR(500) = 
-        'SELECT COUNT(*) AS ProcCount FROM [' + @NewDatabaseName + '].sys.procedures;';
-    DECLARE @ProcCount INT;
-    EXEC sp_executesql @ProcCountCmd, N'@ProcCount INT OUTPUT', @ProcCount = @ProcCount OUTPUT;
+    -- Check if stored procedures exist
+    DECLARE @missing_procs TABLE (proc_name NVARCHAR(128));
     
-    IF @ProcCount > 0
+    INSERT INTO @missing_procs (proc_name)
+    SELECT 'usp_Collect_CPU' WHERE NOT EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_Collect_CPU' AND schema_id = SCHEMA_ID('monitor'));
+    
+    INSERT INTO @missing_procs (proc_name)
+    SELECT 'usp_Collect_Memory' WHERE NOT EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_Collect_Memory' AND schema_id = SCHEMA_ID('monitor'));
+    
+    INSERT INTO @missing_procs (proc_name)
+    SELECT 'usp_Collect_Disk' WHERE NOT EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_Collect_Disk' AND schema_id = SCHEMA_ID('monitor'));
+    
+    IF EXISTS (SELECT 1 FROM @missing_procs)
     BEGIN
-        PRINT '✓ Database contains ' + CAST(@ProcCount AS NVARCHAR(10)) + ' stored procedures.';
+        PRINT 'WARNING: Some expected stored procedures are missing:';
+        SELECT proc_name FROM @missing_procs;
     END
     ELSE
     BEGIN
-        PRINT 'WARNING: Database contains no stored procedures.';
+        PRINT 'All expected stored procedures found successfully';
     END
     
-    -- Check for views
-    DECLARE @ViewCountCmd NVARCHAR(500) = 
-        'SELECT COUNT(*) AS ViewCount FROM [' + @NewDatabaseName + '].sys.views;';
-    DECLARE @ViewCount INT;
-    EXEC sp_executesql @ViewCountCmd, N'@ViewCount INT OUTPUT', @ViewCount = @ViewCount OUTPUT;
+    -- Log validation results
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'migration_log')
+    BEGIN
+        INSERT INTO migration_log (operation, details)
+        VALUES ('VALIDATION', 'Post-migration validation completed');
+    END
     
-    IF @ViewCount > 0
+    PRINT 'Post-migration validation completed successfully';
+    
+END TRY
+BEGIN CATCH
+    PRINT 'ERROR: Post-migration validation failed.';
+    PRINT 'Error message: ' + ERROR_MESSAGE();
+    RETURN;
+END CATCH;
+GO
+
+-- =============================================
+-- STEP 6: CLEANUP AND DOCUMENTATION
+-- =============================================
+
+PRINT 'Creating migration documentation...';
+
+USE [SQLHealthMonitor];
+GO
+
+BEGIN TRY
+    -- Create migration summary view
+    IF NOT EXISTS (SELECT 1 FROM sys.views WHERE name = 'vw_MigrationSummary')
     BEGIN
-        PRINT '✓ Database contains ' + CAST(@ViewCount AS NVARCHAR(10)) + ' views.';
+        CREATE VIEW vw_MigrationSummary AS
+        SELECT 
+            migration_date,
+            operation,
+            details,
+            status,
+            ROW_NUMBER() OVER (ORDER BY id DESC) as rn
+        FROM migration_log
+        ORDER BY id DESC;
     END
-    ELSE
+    
+    -- Create migration status procedure
+    IF NOT EXISTS (SELECT 1 FROM sys.procedures WHERE name = 'usp_GetMigrationStatus')
     BEGIN
-        PRINT 'WARNING: Database contains no views.';
+        CREATE PROCEDURE usp_GetMigrationStatus
+        AS
+        BEGIN
+            SELECT 
+                'Migration Status' as Status,
+                (SELECT COUNT(*) FROM migration_log WHERE status = 'SUCCESS') as SuccessCount,
+                (SELECT COUNT(*) FROM migration_log WHERE status = 'ERROR') as ErrorCount,
+                (SELECT TOP 1 details FROM migration_log ORDER BY id DESC) as LastOperation,
+                (SELECT TOP 1 migration_date FROM migration_log ORDER BY id DESC) as LastOperationDate
+            FROM sys.objects;
+        END
     END
-END
+    
+    -- Log completion
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'migration_log')
+    BEGIN
+        INSERT INTO migration_log (operation, details)
+        VALUES ('COMPLETION', 'Migration completed successfully');
+    END
+    
+    PRINT 'Migration documentation created successfully';
+    
+END TRY
+BEGIN CATCH
+    PRINT 'ERROR: Failed to create migration documentation.';
+    PRINT 'Error message: ' + ERROR_MESSAGE();
+END CATCH;
+GO
 
--- =================================================================================
--- STEP 6: DOCUMENTATION
--- =================================================================================
+-- =============================================
+-- FINAL SUMMARY
+-- =============================================
 
-PRINT '';
-PRINT '=== STEP 6: DOCUMENTATION ===';
+PRINT '=== MIGRATION SUMMARY ===';
+PRINT 'Source database: DBA_Monitor';
+PRINT 'Target database: SQLHealthMonitor';
+PRINT 'Backup location: C:\SQL_Backups\SQLHealthMonitor\';
+PRINT 'Migration date: ' + CONVERT(VARCHAR, GETDATE(), 120);
+PRINT '==========================';
 
--- Create migration log
-DECLARE @MigrationLog NVARCHAR(MAX) = 
-    '-- =================================================================================' + CHAR(13) + CHAR(10) +
-    '-- SQL Health Monitor - Migration Log' + CHAR(13) + CHAR(10) +
-    '-- =================================================================================' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-    'Migration Date: ' + CONVERT(NVARCHAR(20), GETDATE(), 120) + CHAR(13) + CHAR(10) +
-    'Source Database: ' + @OldDatabaseName + CHAR(13) + CHAR(10) +
-    'Target Database: ' + @NewDatabaseName + CHAR(13) + CHAR(10) +
-    'Backup File: ' + @BackupFile + CHAR(13) + CHAR(10) +
-    'Status: SUCCESS' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-    '-- Steps Performed:' + CHAR(13) + CHAR(10) +
-    '1. ✓ Created backup of existing database' + CHAR(13) + CHAR(10) +
-    '2. ✓ Generated rollback script' + CHAR(13) + Char(10) +
-    '3. ✓ Renamed database from ' + @OldDatabaseName + ' to ' + @NewDatabaseName + CHAR(13) + CHAR(10) +
-    '4. ✓ Updated configuration files' + CHAR(13) + CHAR(10) +
-    '5. ✓ Performed validation checks' + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) +
-    '-- Next Steps:' + CHAR(13) + CHAR(10) +
-    '1. Update all PowerShell scripts to use new database name' + CHAR(13) + CHAR(10) +
-    '2. Update SQL Agent jobs to use new database name' + CHAR(13) + CHAR(10) +
-    '3. Update application connection strings' + CHAR(13) + CHAR(10) +
-    '4. Test all monitoring jobs' + CHAR(13) + CHAR(10) +
-    '5. Update documentation' + CHAR
+PRINT 'Migration completed successfully!';
+PRINT 'For more information, run: EXEC usp_GetMigrationStatus;';
+PRINT 'To view migration logs, query: SELECT * FROM vw_MigrationSummary;';
+
+-- =============================================
+-- ROLLBACK INSTRUCTIONS
+-- =============================================
+
+PRINT 'ROLLBACK INSTRUCTIONS (if needed):';
+PRINT '1. Restore the backup: RESTORE DATABASE DBA_Monitor FROM DISK = ''C:\SQL_Backups\SQLHealthMonitor\DBA_Monitor_*.bak''';
+PRINT '2. Drop the renamed database: DROP DATABASE SQLHealthMonitor;');
+PRINT '3. Recreate any dropped objects if necessary';
+PRINT '===============================================';
