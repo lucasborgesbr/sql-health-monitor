@@ -25,16 +25,16 @@
 
 .EXAMPLE
     # Windows authentication
-    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 .EXAMPLE
     # SQL authentication
     $cred = Get-Credential
-    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 
 .EXAMPLE
     # Force overwrite existing database
-    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -Force
+    .\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -Force
 
 .NOTES
     Author: Lucas Allan Borges
@@ -130,7 +130,7 @@ ALTER DATABASE [$Database] SET READ_COMMITTED_SNAPSHOT ON
         Write-Host "[3/5] Creating schema and tables..." -ForegroundColor Yellow
         if ($PSCmdlet.ShouldProcess($Database, "Create schema and tables")) {
             $schemaScript = Get-Content -Path "$installPath\00-create-schema.sql" -Raw
-            $schemaScript = $schemaScript -replace '\[DBA_Monitor\]', "[$Database]"
+            $schemaScript = $schemaScript -replace '\[SQLHealthMonitor\]', "[$Database]"
             
             Invoke-DbaQuery -SqlInstance $sqlInstance -Database $Database -Query $schemaScript -QueryTimeout 300
             Write-Host "      Schema and tables created successfully." -ForegroundColor Green

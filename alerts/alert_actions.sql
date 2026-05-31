@@ -10,7 +10,7 @@
     Compatibility: SQL Server 2016+
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_AlertAction_Execute]

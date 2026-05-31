@@ -13,7 +13,7 @@
     SQL credential. If omitted, uses Windows Authentication.
 
 .PARAMETER DatabaseName
-    Target database. Default: DBA_Monitor
+    Target database. Default: SQLHealthMonitor
 
 .EXAMPLE
     .\Test-Installation.ps1 -ServerInstance "MyServer"
@@ -29,7 +29,7 @@ param(
     [System.Management.Automation.PSCredential]$Credential,
 
     [Parameter()]
-    [string]$DatabaseName = "DBA_Monitor"
+    [string]$DatabaseName = "SQLHealthMonitor"
 )
 
 $ErrorActionPreference = "Continue"

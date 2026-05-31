@@ -48,20 +48,20 @@
 
 .EXAMPLE
     # Complete installation with minimal parameters
-    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 .EXAMPLE
     # Installation with configuration file
-    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ConfigFile '.\config\example-config.json'
+    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ConfigFile '.\config\example-config.json'
 
 .EXAMPLE
     # Installation with custom parameters
-    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com' -Language 'EN'
+    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com' -Language 'EN'
 
 .EXAMPLE
     # SQL authentication
     $cred = Get-Credential
-    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+    .\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 
 .NOTES
     Author: Lucas Allan Borges

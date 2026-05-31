@@ -43,16 +43,16 @@
 
 .EXAMPLE
     # Standard deployment with all jobs
-    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail'
+    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail'
 
 .EXAMPLE
     # Daily schedule with selective job creation
-    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ScheduleType 'Daily' -SkipCollectionJob
+    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ScheduleType 'Daily' -SkipCollectionJob
 
 .EXAMPLE
     # SQL authentication
     $cred = Get-Credential
-    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+    .\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 
 .NOTES
     Author: Lucas Allan Borges

@@ -10,7 +10,7 @@
     Author: Lucas Allan Borges
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- ============================================================

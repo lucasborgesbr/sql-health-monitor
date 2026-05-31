@@ -29,7 +29,7 @@
         EXEC [monitor].[usp_CollectAllInstances] @DebugMode = 1;
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_CollectAllInstances]

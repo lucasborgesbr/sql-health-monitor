@@ -24,7 +24,7 @@
         EXEC [monitor].[usp_CompareInstances] @LookbackHours = 4;
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_CompareInstances]

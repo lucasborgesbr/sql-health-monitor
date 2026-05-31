@@ -43,7 +43,7 @@
 
 .EXAMPLE
     # Basic configuration
-    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
 
 .EXAMPLE
     # Custom thresholds
@@ -55,11 +55,11 @@
         PLE_Warning = 300
         PLE_Critical = 100
     }
-    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -CustomThresholds $thresholds
+    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -CustomThresholds $thresholds
 
 .EXAMPLE
     # Using configuration file
-    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ConfigFile '.\config\my-settings.json'
+    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ConfigFile '.\config\my-settings.json'
 
 .EXAMPLE
     # Complete configuration with custom retention
@@ -70,7 +70,7 @@
         AlertHistoryDays = 365
         AnomalyDays = 90
     }
-    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailRecipients 'dba@company.com,manager@company.com' -RetentionSettings $retention
+    .\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailRecipients 'dba@company.com,manager@company.com' -RetentionSettings $retention
 
 .NOTES
     Author: Lucas Allan Borges

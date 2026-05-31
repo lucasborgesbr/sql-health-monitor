@@ -32,7 +32,7 @@
         EXEC [monitor].[usp_GenerateWeeklyReport] @OverrideLanguage = 'ptbr', @DebugMode = 1;
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_GenerateWeeklyReport]

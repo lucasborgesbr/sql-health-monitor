@@ -3,7 +3,7 @@
     DDL for baseline capture and anomaly detection storage.
     
     Schema: [monitor]
-    Target: DBA_Monitor database
+    Target: SQLHealthMonitor database
     Compatibility: SQL Server 2016+
     Author: Lucas Allan Borges
     
@@ -13,7 +13,7 @@
         - BaselineAnomalies: Detected anomalies log
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 ----------------------------------------------------------------------

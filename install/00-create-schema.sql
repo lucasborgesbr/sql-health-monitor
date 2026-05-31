@@ -2,12 +2,12 @@
     SQL Health Monitor - Schema Creation
     Creates the monitoring schema, configuration, and data collection tables.
     
-    Target: DBA_Monitor database
+    Target: SQLHealthMonitor database
     Compatibility: SQL Server 2016+
     Author: Lucas Borges
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- Create schema

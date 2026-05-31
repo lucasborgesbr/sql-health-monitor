@@ -8,7 +8,7 @@
     Author: Lucas Allan Borges
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 PRINT '=== Installing Baseline Engine (07-baselines.sql) ===';

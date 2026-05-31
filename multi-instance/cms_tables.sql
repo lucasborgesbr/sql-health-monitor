@@ -7,7 +7,7 @@
     Author: Lucas Allan Borges
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 ----------------------------------------------------------------------
@@ -24,7 +24,7 @@ CREATE TABLE [monitor].[RegisteredServers] (
     ConnectionString    NVARCHAR(500)   NULL,                    -- Optional override
     IsActive            BIT             NOT NULL DEFAULT 1,
     IsPrimary           BIT             NOT NULL DEFAULT 0,      -- Is this the CMS host?
-    MonitorDatabase     NVARCHAR(128)   NOT NULL DEFAULT 'DBA_Monitor',
+    MonitorDatabase     NVARCHAR(128)   NOT NULL DEFAULT 'SQLHealthMonitor',
     Notes               NVARCHAR(500)   NULL,
     RegisteredAt        DATETIME2       NOT NULL DEFAULT SYSUTCDATETIME(),
     RegisteredBy        NVARCHAR(128)   NOT NULL DEFAULT SUSER_SNAME(),

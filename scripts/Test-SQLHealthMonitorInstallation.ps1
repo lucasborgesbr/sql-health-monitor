@@ -24,11 +24,11 @@
 
 .EXAMPLE
     # Basic validation
-    .\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+    .\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 .EXAMPLE
     # Comprehensive testing
-    .\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -TestMode 'Comprehensive'
+    .\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -TestMode 'Comprehensive'
 
 .NOTES
     Author: Lucas Allan Borges

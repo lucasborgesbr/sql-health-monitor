@@ -32,7 +32,7 @@
         EXEC [monitor].[usp_EnhancedAnalytics] @AnalysisType = 'DegradationScore', @HoursBack = 168;
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_EnhancedAnalytics]

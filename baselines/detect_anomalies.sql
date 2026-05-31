@@ -26,7 +26,7 @@
         EXEC [monitor].[usp_Baseline_DetectAnomalies] @DebugMode = 1;
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 CREATE OR ALTER PROCEDURE [monitor].[usp_Baseline_DetectAnomalies]

@@ -8,7 +8,7 @@
     Compatibility: SQL Server 2016+
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- ============================================================
@@ -21,7 +21,7 @@ IF NOT EXISTS (SELECT 1 FROM [monitor].[RegisteredServers] WHERE InstanceName = 
     INSERT INTO [monitor].[RegisteredServers] 
         (InstanceName, DisplayName, Environment, AgRole, ServerRole, IsActive, MonitorDatabase, Notes)
     VALUES 
-        ('SQL-DEV-01', 'Development Server', 'DEV', 'STANDALONE', 'MIXED', 1, 'DBA_Monitor', 
+        ('SQL-DEV-01', 'Development Server', 'DEV', 'STANDALONE', 'MIXED', 1, 'SQLHealthMonitor', 
          'Development instance. Used for testing and validation.');
 
 -- Example: Staging instance (standalone)
@@ -29,7 +29,7 @@ IF NOT EXISTS (SELECT 1 FROM [monitor].[RegisteredServers] WHERE InstanceName = 
     INSERT INTO [monitor].[RegisteredServers] 
         (InstanceName, DisplayName, Environment, AgRole, ServerRole, IsActive, MonitorDatabase, Notes)
     VALUES 
-        ('SQL-STG-01', 'Staging Server', 'STG', 'STANDALONE', 'MIXED', 1, 'DBA_Monitor', 
+        ('SQL-STG-01', 'Staging Server', 'STG', 'STANDALONE', 'MIXED', 1, 'SQLHealthMonitor', 
          'Staging instance. Pre-production validation environment.');
 
 -- Example: Production primary (AG)
@@ -37,7 +37,7 @@ IF NOT EXISTS (SELECT 1 FROM [monitor].[RegisteredServers] WHERE InstanceName = 
     INSERT INTO [monitor].[RegisteredServers] 
         (InstanceName, DisplayName, Environment, AgRole, ServerRole, IsActive, IsPrimary, MonitorDatabase, Notes)
     VALUES 
-        ('SQL-PRD-01', 'Production Primary', 'PRD', 'PRIMARY', 'OLTP', 1, 1, 'DBA_Monitor', 
+        ('SQL-PRD-01', 'Production Primary', 'PRD', 'PRIMARY', 'OLTP', 1, 1, 'SQLHealthMonitor', 
          'Primary production OLTP instance. AG primary replica.');
 
 -- Example: Production secondary (AG - reporting workload)
@@ -45,7 +45,7 @@ IF NOT EXISTS (SELECT 1 FROM [monitor].[RegisteredServers] WHERE InstanceName = 
     INSERT INTO [monitor].[RegisteredServers] 
         (InstanceName, DisplayName, Environment, AgRole, ServerRole, IsActive, MonitorDatabase, Notes)
     VALUES 
-        ('SQL-PRD-02', 'Production Secondary', 'PRD', 'SECONDARY', 'REPORTING', 1, 'DBA_Monitor', 
+        ('SQL-PRD-02', 'Production Secondary', 'PRD', 'SECONDARY', 'REPORTING', 1, 'SQLHealthMonitor', 
          'AG secondary replica. Read-only reporting workload.');
 
 -- Example: ETL/Application server
@@ -53,7 +53,7 @@ IF NOT EXISTS (SELECT 1 FROM [monitor].[RegisteredServers] WHERE InstanceName = 
     INSERT INTO [monitor].[RegisteredServers] 
         (InstanceName, DisplayName, Environment, AgRole, ServerRole, IsActive, MonitorDatabase, Notes)
     VALUES 
-        ('SQL-ETL-01', 'ETL Server', 'PRD', 'STANDALONE', 'ETL', 1, 'DBA_Monitor', 
+        ('SQL-ETL-01', 'ETL Server', 'PRD', 'STANDALONE', 'ETL', 1, 'SQLHealthMonitor', 
          'Application/ETL instance. Handles data processing and integrations.');
 
 GO

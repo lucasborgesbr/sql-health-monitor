@@ -21,12 +21,12 @@
 
 .EXAMPLE
     # Basic validation
-    .\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+    .\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 .EXAMPLE
     # SQL authentication
     $cred = Get-Credential
-    .\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+    .\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 
 .NOTES
     Author: Lucas Allan Borges

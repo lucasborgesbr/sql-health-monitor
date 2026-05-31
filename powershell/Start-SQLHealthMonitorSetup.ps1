@@ -334,7 +334,7 @@ function Invoke-Step2-Connection {
     if ($NonInteractive) {
         $instance = Get-AnswerFromFile -Key 'ServerInstance' -Default 'localhost'
         $authMode = Get-AnswerFromFile -Key 'AuthMode' -Default 'Windows'
-        $database = Get-AnswerFromFile -Key 'Database' -Default 'DBA_Monitor'
+        $database = Get-AnswerFromFile -Key 'Database' -Default 'SQLHealthMonitor'
     }
     else {
         $instance = Read-ValidatedInput -Prompt "SQL Server instance name" -Default "localhost" -Required
@@ -346,7 +346,7 @@ function Invoke-Step2-Connection {
         $authChoice = Read-MenuChoice -Prompt "Authentication method" -Options $authOptions -Default '1'
         $authMode = if ($authChoice -eq '1') { 'Windows' } else { 'SQL' }
 
-        $database = Read-ValidatedInput -Prompt "Monitor database name" -Default "DBA_Monitor"
+        $database = Read-ValidatedInput -Prompt "Monitor database name" -Default "SQLHealthMonitor"
     }
 
     $script:Answers.ServerInstance = $instance

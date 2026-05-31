@@ -13,10 +13,10 @@
     SQL credential for authentication. If omitted, uses Windows Authentication.
 
 .PARAMETER DatabaseName
-    Target database name. Default: DBA_Monitor
+    Target database name. Default: SQLHealthMonitor
 
 .PARAMETER CreateDatabase
-    If specified, creates the DBA_Monitor database if it doesn't exist.
+    If specified, creates the SQLHealthMonitor database if it doesn't exist.
 
 .PARAMETER ScriptPath
     Path to the sql-health-monitor folder. Default: script's parent directory.
@@ -38,7 +38,7 @@ param(
     [System.Management.Automation.PSCredential]$Credential,
 
     [Parameter()]
-    [string]$DatabaseName = "DBA_Monitor",
+    [string]$DatabaseName = "SQLHealthMonitor",
 
     [Parameter()]
     [switch]$CreateDatabase,

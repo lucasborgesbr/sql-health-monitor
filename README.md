@@ -110,7 +110,7 @@ Install-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' `
 Install-SQLHealthMonitor -ServerInstance 'SQL-DEV-01' -SkipAgentJobs -Language EN
 
 # Install with custom database name
-Install-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor_Production'
+Install-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor_Production'
 ```
 
 ### Option 3: Manual Installation
@@ -119,9 +119,9 @@ For environments requiring granular control:
 
 ```sql
 -- 1. Create the database (if not exists)
-CREATE DATABASE [DBA_Monitor];
+CREATE DATABASE [SQLHealthMonitor];
 GO
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- 2. Execute install scripts in order

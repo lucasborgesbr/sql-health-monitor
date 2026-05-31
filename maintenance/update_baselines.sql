@@ -9,7 +9,7 @@
     Compatibility: SQL Server 2016+
 */
 
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- Create baselines table if not exists
