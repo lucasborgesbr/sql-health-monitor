@@ -4,6 +4,8 @@
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://docs.microsoft.com/powershell/scripting/overview)
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2016%2B-green.svg)](https://www.microsoft.com/sql-server/)
 
+> **Note:** Portuguese (Brazil) version available at [README-PTBR.md](README-PTBR.md)
+
 ## 📋 Overview
 
 The SQL Health Monitor is a comprehensive proactive monitoring solution for SQL Server environments. It provides real-time health monitoring, intelligent alerting, and detailed reporting capabilities designed for production environments running SQL Server 2016 and later.
