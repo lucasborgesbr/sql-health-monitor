@@ -159,7 +159,7 @@ Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType DailyReport -Langu
 
 ### Core Configuration
 
-Edit the configuration file at `powershell/config/default.json`:
+Edit the configuration file at `powershell\config\default.json`:
 
 ```json
 {
@@ -456,7 +456,7 @@ EXEC [monitor].[usp_PurgeHistoricalData] @BatchSize = 10000;
 
 ```powershell
 # Send custom report
-Send-HealthReport -ServerInstance 'SQL-PRD-01' -ReportType Daily -Language EN -OutputPath 'C:\Reports\daily.html'
+Send-HealthReport -ServerInstance 'SQL-PRD-01' -ReportType Daily -Language EN -OutputPath '.\Reports\daily.html'
 
 # Send alert notification
 Send-HealthReport -ServerInstance 'SQL-PRD-01' -ReportType Alert -Language PTBR -Recipients 'emergency-team@company.com'
@@ -474,7 +474,7 @@ Main orchestrator that ties collectors, alerts, and reports together.
 | ConfigProfile | string | DEFAULT | Config profile in database |
 | RunType | string | (required) | Collection, DailyReport, WeeklyReport, Alert |
 | Language | string | EN | EN or PTBR |
-| ConfigPath | string | config/default.json | Path to JSON config |
+| ConfigPath | string | .\powershell\config\default.json | Path to JSON config |
 | AllInstances | switch | false | Loop through RegisteredServers table |
 | Environment | string | (all) | Filter: DEV, STG, PRD, DR |
 | ParallelDegree | int | 4 | Max parallel collections (multi-instance) |
@@ -743,13 +743,13 @@ Invoke-SQLHealthMonitor -ServerInstance 'SQL-PRD-01' -RunType DailyReport -Debug
 
 ```powershell
 # View recent log entries
-Get-Content "C:\SQLHealthMonitor\Logs\SQLHealthMonitor.log" | Select-Object -Last 50
+Get-Content ".\SQLHealthMonitor\Logs\SQLHealthMonitor.log" | Select-Object -Last 50
 
 # Filter error logs
-Get-Content "C:\SQLHealthMonitor\Logs\SQLHealthMonitor.log" | Where-Object { $_ -match "ERROR" }
+Get-Content ".\SQLHealthMonitor\Logs\SQLHealthMonitor.log" | Where-Object { $_ -match "ERROR" }
 
 # Monitor real-time logs
-Get-Content "C:\SQLHealthMonitor\Logs\SQLHealthMonitor.log" -Wait
+Get-Content ".\SQLHealthMonitor\Logs\SQLHealthMonitor.log" -Wait
 ```
 
 ## 🤝 Contributing & License
@@ -768,15 +768,15 @@ We welcome contributions! Please follow these guidelines:
 
 ```powershell
 # Clone the repository
-git clone https://github.com/your-org/sql-health-monitor.git
+git clone https://github.com/lucasborgesbr/sql-health-monitor.git
 cd sql-health-monitor
 
 # Install development dependencies
 Install-Module dbatools -Scope CurrentUser -Force
 Install-Module Pester -Scope CurrentUser -Force
 
-# Run tests
-Invoke-Pester -Path tests/
+# Run tests (when available)
+# Invoke-Pester -Path tests/
 ```
 
 ### Code Style Guidelines
@@ -830,9 +830,9 @@ All third-party components are subject to their respective licenses.
 
 ### Community Support
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/your-org/sql-health-monitor/issues)
-- **Discussions**: [Join community discussions](https://github.com/your-org/sql-health-monitor/discussions)
-- **Wiki**: [Contribute to documentation](https://github.com/your-org/sql-health-monitor/wiki)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/lucasborgesbr/sql-health-monitor/issues)
+- **Discussions**: [Join community discussions](https://github.com/lucasborgesbr/sql-health-monitor/discussions)
+- **Wiki**: [Contribute to documentation](https://github.com/lucasborgesbr/sql-health-monitor/wiki)
 
 ### Professional Support
 
@@ -840,7 +840,7 @@ For professional support and consulting services:
 
 - **Email**: lucasborgesbr@gmail.com
 - **LinkedIn**: [Lucas Allan Borges](https://linkedin.com/in/lucasallanborges)
-- **Website**: [https://your-company.com](https://your-company.com)
+- **Repository**: [https://github.com/lucasborgesbr/sql-health-monitor](https://github.com/lucasborgesbr/sql-health-monitor)
 
 ### Release Notes
 
