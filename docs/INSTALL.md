@@ -29,9 +29,9 @@ Execute scripts in this order on each target server:
 
 ```sql
 -- 1. Create the database (if not exists)
-CREATE DATABASE [DBA_Monitor];
+CREATE DATABASE [SQLHealthMonitor];
 GO
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 GO
 
 -- 2. Run install scripts in order
@@ -78,7 +78,7 @@ GO
 ### 1. Configure Email Settings
 
 ```sql
-USE [DBA_Monitor];
+USE [SQLHealthMonitor];
 UPDATE [monitor].[Settings] SET SettingValue = 'your-team@company.com' 
 WHERE Category = 'Email' AND SettingName = 'Recipients';
 
@@ -141,5 +141,5 @@ EXEC sp_delete_job @job_name = 'SQL Health Monitor - Purge Old Data';
 EXEC sp_delete_job @job_name = 'SQL Health Monitor - Update Baselines';
 
 -- Drop database (WARNING: destroys all historical data)
--- DROP DATABASE [DBA_Monitor];
+-- DROP DATABASE [SQLHealthMonitor];
 ```

@@ -7,7 +7,7 @@ Standardized the database name across all files in the SQL Health Monitor projec
 
 ### 1. README.md
 - Updated manual installation examples to use `SQLHealthMonitor`
-- Updated example configurations to use `SQLHealthMonitor` instead of `DBA_Monitor`
+- Updated example configurations to use `SQLHealthMonitor` instead of `SQLHealthMonitor`
 - Fixed all inline SQL examples in troubleshooting section
 
 ### 2. Install Scripts (install/)
@@ -63,30 +63,30 @@ Standardized the database name across all files in the SQL Health Monitor projec
 The default configuration file (`powershell/config/default.json`) already used `SQLHealthMonitor` as the database name, which is now consistent across all documentation and scripts.
 
 ## Backward Compatibility
-**Important:** This change is **not backward compatible**. Existing installations using the `DBA_Monitor` database name will need to:
+**Important:** This change is **not backward compatible**. Existing installations using the `SQLHealthMonitor` database name will need to:
 1. Create a new database named `SQLHealthMonitor`
 2. Re-run the installation scripts
 3. Migrate data if needed
 
 ## Migration Path
-For existing installations with `DBA_Monitor`:
+For existing installations with `SQLHealthMonitor`:
 
 ```sql
 -- Option 1: Rename the database
-ALTER DATABASE [DBA_Monitor] MODIFY NAME = [SQLHealthMonitor];
+ALTER DATABASE [SQLHealthMonitor] MODIFY NAME = [SQLHealthMonitor];
 
 -- Option 2: Create new database and migrate data
 CREATE DATABASE [SQLHealthMonitor];
 USE [SQLHealthMonitor];
 
--- Copy tables from DBA_Monitor
-SELECT * INTO [monitor] FROM [DBA_Monitor].[monitor];
-SELECT * INTO [monitor].[RegisteredServers] FROM [DBA_Monitor].[monitor].[RegisteredServers];
+-- Copy tables from SQLHealthMonitor
+SELECT * INTO [monitor] FROM [SQLHealthMonitor].[monitor];
+SELECT * INTO [monitor].[RegisteredServers] FROM [SQLHealthMonitor].[monitor].[RegisteredServers];
 -- Continue with other tables...
 
 -- Drop old database when migration is complete
 USE master;
-DROP DATABASE [DBA_Monitor];
+DROP DATABASE [SQLHealthMonitor];
 ```
 
 ## Files Updated
@@ -103,7 +103,7 @@ DROP DATABASE [DBA_Monitor];
 **Total:** 38 files updated
 
 ## Verification
-All references to `DBA_Monitor` have been removed from:
+All references to `SQLHealthMonitor` have been removed from:
 - All .ps1 scripts (PowerShell)
 - All .sql scripts (T-SQL)
 - Documentation (README.md)

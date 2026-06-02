@@ -315,6 +315,23 @@ CREATE TABLE [monitor].[ReportHistory] (
 );
 GO
 
+-- Recommendations table
+IF OBJECT_ID('monitor.Recommendations', 'U') IS NULL
+CREATE TABLE [monitor].[Recommendations] (
+    Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    MetricName      NVARCHAR(100) NOT NULL,
+    CurrentValue    DECIMAL(18,2) NULL,
+    Recommendation  NVARCHAR(MAX) NOT NULL,
+    Priority        NVARCHAR(20)  NOT NULL,  -- HIGH, MEDIUM, LOW
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    Acknowledged    BIT           NOT NULL DEFAULT 0,
+    AcknowledgedBy  NVARCHAR(128) NULL,
+    AcknowledgedAt  DATETIME2     NULL,
+    INDEX IX_Recommendations_Date NONCLUSTERED (CreatedAt),
+    INDEX IX_Recommendations_Priority NONCLUSTERED (Priority, CreatedAt)
+);
+GO
+
 PRINT '✓ Schema [monitor] created successfully.';
 PRINT '✓ All monitoring tables created.';
 GO

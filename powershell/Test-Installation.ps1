@@ -131,10 +131,10 @@ Write-Host "── Procedures ──" -ForegroundColor White
 
 $procedures = @(
     "usp_Collect_CPU", "usp_Collect_Memory", "usp_Collect_Disk",
-    "usp_Collect_WaitStats", "usp_Collect_Blocking", "usp_Collect_AG",
-    "usp_Collect_CDC", "usp_Collect_TopQueries", "usp_Collect_IndexHealth",
-    "usp_Collect_Backups", "usp_Collect_Jobs", "usp_Collect_TempDB",
-    "usp_Collect_FileGrowth", "usp_Collect_ErrorLog",
+    "usp_Collect_Waits", "usp_Collect_Blocking", "usp_Collect_AG_Health",
+    "usp_Collect_CDC_Health", "usp_Collect_TopQueries", "usp_Collect_IndexHealth",
+    "usp_Collect_BackupStatus", "usp_Collect_JobHistory", "usp_Collect_TempDB",
+    "usp_Collect_DatabaseGrowth", "usp_Collect_ErrorLog",
     "usp_RunAllCollectors", "usp_RunReport",
     "usp_Report_DailyHealth", "usp_Report_WeeklyDeepDive",
     "usp_AlertEngine_Check", "usp_RunAlertEngine",

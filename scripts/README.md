@@ -25,14 +25,14 @@ Este diretório contém scripts PowerShell genéricos para instalação, configu
 
 ```powershell
 # Instalação completa com parâmetros básicos
-.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 # Instalação com arquivo de configuração
-.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ConfigFile '.\config\example-config.json'
+.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ConfigFile '.\config\example-config.json'
 
 # Instalação com autenticação SQL
 $cred = Get-Credential
-.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 ```
 
 ### Instalação Passo a Passo
@@ -40,25 +40,25 @@ $cred = Get-Credential
 #### 1. Setup do Banco de Dados
 
 ```powershell
-.\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 #### 2. Configuração do Sistema
 
 ```powershell
-.\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+.\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
 ```
 
 #### 3. Agendamento de Tarefas
 
 ```powershell
-.\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail'
+.\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail'
 ```
 
 #### 4. Validação
 
 ```powershell
-.\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 ## Parâmetros Comuns
@@ -98,7 +98,7 @@ Para deployments complexos, utilize arquivos de configuração JSON:
   "Connection": {
     "ServerInstance": "SQL-PRD-01",
     "AuthMethod": "Windows",
-    "Database": "DBA_Monitor"
+    "Database": "SQLHealthMonitor"
   },
   "Alerts": {
     "Enabled": true,
@@ -125,10 +125,10 @@ Todos os scripts suportam o parâmetro `-WhatIf` para pré-visualizar ações:
 
 ```powershell
 # Pré-visualizar instalação completa
-.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -WhatIf
+.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -WhatIf
 
 # Pré-visualizar setup do banco de dados
-.\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -WhatIf
+.\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -WhatIf
 ```
 
 ## Deploy em Massa
@@ -142,7 +142,7 @@ $servers = @('SQL-PRD-01', 'SQL-PRD-02', 'SQL-STG-01')
 # Instalação em massa
 $servers | ForEach-Object {
     Write-Host "Instalando em $_..."
-    .\Install-SQLHealthMonitor.ps1 -ServerInstance $_ -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+    .\Install-SQLHealthMonitor.ps1 -ServerInstance $_ -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
 }
 ```
 
@@ -150,12 +150,12 @@ $servers | ForEach-Object {
 
 ### Teste Básico
 ```powershell
-.\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 ### Validação Completa
 ```powershell
-.\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 ## Personalização
@@ -193,7 +193,7 @@ $retention = @{
 Use o parâmetro `-Verbose` para logs detalhados:
 
 ```powershell
-.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -Verbose
+.\Install-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -Verbose
 ```
 
 ### Erros Comuns

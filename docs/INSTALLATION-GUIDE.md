@@ -37,7 +37,7 @@ Os scripts de instalação estão localizados no diretório `scripts/`:
 
 ```powershell
 # Executar o setup do banco de dados
-.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 **Parâmetros:**
@@ -50,21 +50,21 @@ Os scripts de instalação estão localizados no diretório `scripts/`:
 **Exemplos:**
 ```powershell
 # Autenticação Windows (padrão)
-.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 # Autenticação SQL
 $cred = Get-Credential
-.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -AuthMethod 'Sql' -SqlCredential $cred
+.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -AuthMethod 'Sql' -SqlCredential $cred
 
 # Forçar recriação do banco
-.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -Force
+.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -Force
 ```
 
 ### Passo 2: Configuração do Sistema
 
 ```powershell
 # Configurar alertas e parâmetros
-.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
 ```
 
 **Parâmetros:**
@@ -80,7 +80,7 @@ $cred = Get-Credential
 **Exemplos:**
 ```powershell
 # Configuração básica
-.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
 
 # Configuração com limiares personalizados
 $thresholds = @{
@@ -91,17 +91,17 @@ $thresholds = @{
     PLE_Warning = 300
     PLE_Critical = 100
 }
-.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -CustomThresholds $thresholds
+.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -CustomThresholds $thresholds
 
 # Configuração completa via arquivo JSON
-.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ConfigFile '.\config\my-settings.json'
+.\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ConfigFile '.\config\my-settings.json'
 ```
 
 ### Passo 3: Agendamento de Tarefas
 
 ```powershell
 # Criar jobs do SQL Agent
-.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail'
+.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail'
 ```
 
 **Parâmetros:**
@@ -118,23 +118,23 @@ $thresholds = @{
 **Exemplos:**
 ```powershell
 # Agendamento padrão (15 minutos)
-.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -EmailProfile 'DBA Mail'
+.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail'
 
 # Agendamento diário
-.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -ScheduleType 'Daily' -EmailProfile 'DBA Mail'
+.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -ScheduleType 'Daily' -EmailProfile 'DBA Mail'
 
 # Criar apenas jobs específicos
-.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -SkipCollectionJob -SkipMaintenanceJob
+.\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -SkipCollectionJob -SkipMaintenanceJob
 ```
 
 ### Passo 4: Validação da Instalação
 
 ```powershell
 # Teste básico da instalação
-.\scripts\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\scripts\Test-SQLHealthMonitorInstallation.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 
 # Validação completa
-.\scripts\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor'
+.\scripts\Validate-SQLHealthMonitorSetup.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor'
 ```
 
 **Tipos de Teste:**
@@ -151,7 +151,7 @@ Para deployments em massa ou configurações complexas, utilize um arquivo de co
   "Connection": {
     "ServerInstance": "SQL-PRD-01",
     "AuthMethod": "Windows",
-    "Database": "DBA_Monitor"
+    "Database": "SQLHealthMonitor"
   },
   "Collectors": {
     "EnableAll": true,
@@ -287,7 +287,7 @@ Os scripts incluem verbose logging. Use o parâmetro `-Verbose` para detalhes:
 
 ```powershell
 # Executar com logs detalhados
-.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'DBA_Monitor' -Verbose
+.\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance 'SQL-PRD-01' -Database 'SQLHealthMonitor' -Verbose
 ```
 
 ## Deploy em Massa
@@ -301,9 +301,9 @@ $servers = @('SQL-PRD-01', 'SQL-PRD-02', 'SQL-STG-01', 'SQL-ETL-01')
 # Loop de instalação
 $servers | ForEach-Object {
     Write-Host "Instalando em $_..."
-    .\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance $_ -Database 'DBA_Monitor'
-    .\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance $_ -Database 'DBA_Monitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
-    .\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance $_ -Database 'DBA_Monitor' -EmailProfile 'DBA Mail'
+    .\scripts\Setup-SQLHealthMonitorDatabase.ps1 -ServerInstance $_ -Database 'SQLHealthMonitor'
+    .\scripts\Configure-SQLHealthMonitor.ps1 -ServerInstance $_ -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail' -EmailRecipients 'dba@company.com'
+    .\scripts\Deploy-SQLHealthMonitorJobs.ps1 -ServerInstance $_ -Database 'SQLHealthMonitor' -EmailProfile 'DBA Mail'
 }
 ```
 
