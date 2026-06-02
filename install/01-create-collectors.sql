@@ -57,7 +57,8 @@ BEGIN
         ('monitor.usp_Collect_DatabaseGrowth','CollectFileGrowth'),
         ('monitor.usp_Collect_ErrorLog',    'CollectErrorLog'),
         ('monitor.usp_Collect_LogGrowth',   'CollectLogGrowth'),  -- Enhanced log growth
-        ('monitor.usp_Collect_Deadlocks',   'CollectDeadlocks');  -- Enhanced deadlock detection
+        ('monitor.usp_Collect_Deadlocks',   'CollectDeadlocks'),  -- Enhanced deadlock detection
+        ('monitor.usp_Collect_UptimeTracker', 'CollectUptimeTracker');  -- Uptime SLA tracking
 
     -- Execute each collector
     DECLARE @CurrentOrder INT = 1;

@@ -53,7 +53,10 @@ INSERT INTO [monitor].[Settings] (Category, SettingName, SettingValue, Descripti
 ('Features', 'CollectJobs', '1', 'Enable job history collection', 'bool'),
 ('Features', 'CollectTempDB', '1', 'Enable TempDB collection', 'bool'),
 ('Features', 'CollectFileGrowth', '1', 'Enable file growth tracking', 'bool'),
-('Features', 'CollectErrorLog', '1', 'Enable error log collection', 'bool');
+('Features', 'CollectErrorLog', '1', 'Enable error log collection', 'bool'),
+('Features', 'CollectLogGrowth', '1', 'Enable log growth tracking', 'bool'),
+('Features', 'CollectDeadlocks', '1', 'Enable deadlock detection', 'bool'),
+('Features', 'CollectUptimeTracker', '1', 'Enable uptime SLA tracking', 'bool');
 GO
 
 ----------------------------------------------------------------------
@@ -97,7 +100,12 @@ INSERT INTO [monitor].[Thresholds] (MetricName, WarningValue, CriticalValue, Ope
 ('TempDB_UsedPct', 70, 90, '>=', 'TempDB space used percentage'),
 
 -- Jobs
-('Jobs_FailedCount', 1, 3, '>=', 'Failed jobs in last collection');
+('Jobs_FailedCount', 1, 3, '>=', 'Failed jobs in last collection'),
+
+-- Uptime/SLA
+('SLA_UptimePercentage', 99.5, 99.0, '<', 'Uptime percentage threshold'),
+('SLA_DowntimeMinutes', 60, 1440, '>=', 'Downtime threshold (minutes)'),
+('SLA_IncidentResponseTime', 60, 240, '>=', 'Incident response time threshold (minutes)');
 GO
 
 ----------------------------------------------------------------------

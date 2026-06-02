@@ -332,6 +332,82 @@ CREATE TABLE [monitor].[Recommendations] (
 );
 GO
 
+-- Uptime Tracker tables
+-- Incident classification for SLA tracking
+IF OBJECT_ID('monitor.Incidents', 'U') IS NULL
+CREATE TABLE [monitor].[Incidents] (
+    Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    IncidentId      UNIQUEIDENTIFIER DEFAULT NEWID(),
+    DetectedAt      DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    ResolvedAt      DATETIME2     NULL,
+    IncidentType    NVARCHAR(50)  NOT NULL,  -- Planned, Unplanned, Emergency
+    Category        NVARCHAR(50)  NOT NULL,  -- Database, Server, Network, Application
+    Severity        NVARCHAR(20)  NOT NULL,  -- Critical, High, Medium, Low
+    Title           NVARCHAR(200) NOT NULL,
+    Description     NVARCHAR(MAX) NOT NULL,
+    Impact          NVARCHAR(500) NULL,      -- Business impact description
+    DurationMinutes INT           NULL,      -- Calculated field
+    IsResolved      BIT           NOT NULL DEFAULT 0,
+    CreatedBy       NVARCHAR(128) NOT NULL,
+    UpdatedBy       NVARCHAR(128) NULL,
+    INDEX IX_Incidents_Date NONCLUSTERED (DetectedAt),
+    INDEX IX_Incidents_Type NONCLUSTERED (IncidentType, DetectedAt),
+    INDEX IX_Incidents_Severity NONCLUSTERED (Severity, DetectedAt)
+);
+GO
+
+-- Uptime tracking periods
+IF OBJECT_ID('monitor.UptimePeriods', 'U') IS NULL
+CREATE TABLE [monitor].[UptimePeriods] (
+    Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    PeriodStart     DATETIME2     NOT NULL,
+    PeriodEnd       DATETIME2     NOT NULL,
+    TotalMinutes    INT           NOT NULL,
+    UptimeMinutes   INT           NOT NULL,
+    DowntimeMinutes INT           NOT NULL,
+    UptimePercentage DECIMAL(5,2) NOT NULL,
+    IncidentCount   INT           NOT NULL DEFAULT 0,
+    CriticalIncidents INT          NOT NULL DEFAULT 0,
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    PeriodType      NVARCHAR(20)  NOT NULL,  -- Hourly, Daily, Weekly, Monthly
+    INDEX IX_UptimePeriods_Date NONCLUSTERED (PeriodStart),
+    INDEX IX_UptimePeriods_Type NONCLUSTERED (PeriodType, PeriodStart)
+);
+GO
+
+-- SLA tracking
+IF OBJECT_ID('monitor.SLATracking', 'U') IS NULL
+CREATE TABLE [monitor].[SLATracking] (
+    Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    PeriodStart     DATETIME2     NOT NULL,
+    PeriodEnd       DATETIME2     NOT NULL,
+    TargetUptime    DECIMAL(5,2) NOT NULL,    -- Target SLA percentage
+    ActualUptime    DECIMAL(5,2) NOT NULL,
+    SLAMet          BIT           NOT NULL,
+    ViolationCount  INT           NOT NULL,
+    CriticalViolations INT         NOT NULL,
+    PenaltyMinutes  INT           NOT NULL,
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    PeriodType      NVARCHAR(20)  NOT NULL,  -- Daily, Weekly, Monthly
+    INDEX IX_SLATracking_Date NONCLUSTERED (PeriodStart),
+    INDEX IX_SLATracking_Type NONCLUSTERED (PeriodType, PeriodStart)
+);
+GO
+
+-- Incident sources tracking
+IF OBJECT_ID('monitor.IncidentSources', 'U') IS NULL
+CREATE TABLE [monitor].[IncidentSources] (
+    Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
+    IncidentId      UNIQUEIDENTIFIER NOT NULL,
+    SourceType      NVARCHAR(50)  NOT NULL,  -- Alert, ErrorLog, Manual, Auto-detected
+    SourceDetail    NVARCHAR(500) NULL,
+    DetectionMethod NVARCHAR(100) NOT NULL,  -- Threshold, Pattern, Manual
+    ConfidenceScore DECIMAL(5,2)  NULL,      -- 0.00 to 1.00
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    FOREIGN KEY (IncidentId) REFERENCES [monitor].[Incidents](IncidentId)
+);
+GO
+
 PRINT '✓ Schema [monitor] created successfully.';
 PRINT '✓ All monitoring tables created.';
 GO

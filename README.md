@@ -288,7 +288,7 @@ sql-health-monitor/
 │   └── config/
 │       ├── default.json                 # Default configuration
 │       └── answer-file-sample.json      # Sample answers
-├── collectors/                      # T-SQL collection scripts (16 collectors)
+├── collectors/                      # T-SQL collection scripts (17 collectors)
 │   ├── collect_cpu.sql                  # CPU utilization
 │   ├── collect_memory.sql               # Memory metrics
 │   ├── collect_disk.sql                 # Disk space & I/O
@@ -304,7 +304,8 @@ sql-health-monitor/
 │   ├── collect_tempdb.sql               # TempDB usage
 │   ├── collect_errorlog.sql             # Error log analysis
 │   ├── collect_log_growth.sql           # Transaction log growth
-│   └── collect_database_growth.sql     # Database file growth
+│   ├── collect_database_growth.sql     # Database file growth
+│   └── collect_uptime_tracker.sql      # Uptime SLA tracking
 ├── alerts/                         # Alert engine
 │   ├── alert_engine.sql                # Alert evaluation logic
 │   ├── alert_actions.sql               # Automated response actions
@@ -316,6 +317,7 @@ sql-health-monitor/
 ├── reports/                        # Report generation
 │   ├── daily_health_check.sql         # Daily health report
 │   ├── weekly_deep_dive.sql           # Weekly analysis report
+│   ├── monthly_uptime_report.sql      # Monthly uptime SLA report
 │   ├── recommendations_engine.sql     # Actionable recommendations
 │   └── templates/                    # HTML email templates
 │       ├── daily_en.html              # Daily report template (EN)
@@ -335,6 +337,8 @@ sql-health-monitor/
 │   └── compare_instances.sql         # Health comparison
 ├── config/                         # Database configuration
 ├── views/                          # SQL views for reporting
+│   ├── vw_CurrentHealth.sql          # Current health status view
+│   ├── vw_UptimeTracker.sql         # Uptime tracking and SLA views
 ├── docs/                          # Documentation
 │   ├── INSTALL.md                   # Installation guide
 │   ├── CONFIGURATION.md            # Configuration reference
@@ -787,6 +791,119 @@ Install-Module Pester -Scope CurrentUser -Force
 - **T-SQL**: Follow [T-SQL Coding Conventions](https://docs.microsoft.com/sql/t-sql/development-recommendations)
 - **Comments**: Use clear, concise comments explaining complex logic
 - **Error Handling**: Implement comprehensive error handling and logging
+
+## 📊 Uptime Tracker & SLA Monitoring
+
+The SQL Health Monitor includes a comprehensive uptime tracking system that monitors service availability and calculates SLA compliance.
+
+### Features
+
+- **Automatic Incident Detection** - Identifies unplanned downtime, planned maintenance, and critical failures
+- **SLA Compliance Tracking** - Monitors uptime percentage against business targets
+- **Monthly Reports** - Detailed monthly uptime summaries with trend analysis
+- **Incident Classification** - Categorizes incidents by type, severity, and business impact
+- **Real-time Dashboard** - Current uptime status and active incidents
+
+### Installation
+
+```sql
+-- Install uptime tracking components
+:r install/09-uptime-tracker.sql
+
+-- Validate installation
+:r validate_uptime_tracker.sql
+```
+
+### Usage
+
+```sql
+-- Run hourly uptime tracking
+EXEC monitor.usp_Collect_UptimeTracker;
+
+-- Generate monthly uptime report
+EXEC monitor.usp_Generate_MonthlyUptimeReport @ReportMonth = '2026-06-01';
+
+-- View current uptime status
+SELECT * FROM monitor.vw_CurrentUptimeStatus;
+
+-- View monthly summary
+SELECT * FROM monitor.vw_MonthlyUptimeSummary;
+
+-- View active incidents
+SELECT * FROM monitor.vw_ActiveIncidents;
+```
+
+### Incident Classification
+
+| Type | Description | Examples |
+|------|-------------|----------|
+| **Planned** | Scheduled maintenance | Upgrades, patches, migrations |
+| **Unplanned** | Unexpected failures | Hardware crashes, software bugs |
+| **Emergency** | Critical failures requiring immediate action | Complete service interruption |
+
+### Severity Levels
+
+| Level | Impact | Response Time |
+|-------|--------|---------------|
+| **Critical** | Complete service interruption | < 15 minutes |
+| **High** | Severe degradation | < 1 hour |
+| **Medium** | Noticeable impact | < 4 hours |
+| **Low** | Minimal impact | < 24 hours |
+
+### SLA Configuration
+
+```sql
+-- Configure SLA targets
+INSERT INTO monitor.Settings (Category, SettingName, SettingValue, Description)
+VALUES ('SLA', 'TargetUptime', '99.9', 'Target uptime percentage');
+
+-- Set incident response times
+INSERT INTO monitor.Settings (Category, SettingName, SettingValue, Description)
+VALUES ('SLA', 'IncidentResponseTime', '60', 'Critical incident response time (minutes)');
+```
+
+### Monitoring
+
+- **Hourly Collection** - Automated uptime tracking every hour
+- **Monthly Reports** - Comprehensive monthly summaries
+- **Real-time Dashboard** - Current status and active incidents
+- **Historical Analysis** - Trend analysis and forecasting
+
+### Troubleshooting
+
+Common issues with uptime tracking:
+
+#### 1. No Uptime Data
+
+```sql
+-- Check if uptime tracker is enabled
+SELECT * FROM monitor.Settings WHERE Category = 'Features' AND SettingName = 'CollectUptimeTracker';
+
+-- Run manual collection
+EXEC monitor.usp_Collect_UptimeTracker;
+```
+
+#### 2. Incorrect Incident Detection
+
+```sql
+-- Check incident sources
+SELECT * FROM monitor.IncidentSources WHERE DetectedAt >= DATEADD(DAY, -1, GETDATE());
+
+-- View incident details
+SELECT * FROM monitor.Incidents WHERE DetectedAt >= DATEADD(DAY, -1, GETDATE());
+```
+
+#### 3. SLA Violations
+
+```sql
+-- Check SLA compliance
+SELECT * FROM monitor.SLATracking WHERE PeriodStart >= DATEADD(MONTH, -1, GETDATE());
+
+-- Review SLA settings
+SELECT * FROM monitor.Settings WHERE Category = 'SLA';
+```
+
+## 🤝 Contributing & License
 
 ### Adding New Features
 
