@@ -300,7 +300,7 @@ sql-health-monitor/
 │   ├── collect_top_queries.sql          # Top queries por recurso
 │   ├── collect_index_health.sql        # Fragmentação de índices
 │   ├── collect_backup_status.sql        # Verificação de backup
-│   ├── collect_jobs.sql                # Jobs do SQL Agent
+│   ├── collect_job_history.sql          # Jobs do SQL Agent
 │   ├── collect_tempdb.sql               # Uso do TempDB
 │   ├── collect_errorlog.sql             # Análise de error log
 │   ├── collect_log_growth.sql           # Crescimento do transaction log
@@ -331,7 +331,7 @@ sql-health-monitor/
 ├── multi-instance/                 # Suporte a gestão centralizada
 │   ├── cms_tables.sql                # Tabelas CMS para multi-instância
 │   ├── register_sample.sql           # Amostra de registro de instância
-│   ├── collect_all_instances.sql     # Coleta cross-instância
+│   ├── compare_instances.sql           # Comparação de instâncias
 │   └── compare_instances.sql         # Comparação de saúde entre instâncias
 ├── config/                         # Configuração do banco de dados
 ├── views/                          # Views SQL para relatórios
