@@ -18,9 +18,26 @@ CREATE TABLE [monitor].[AlertCooldown] (
 );
 GO
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_RunAlertEngine]
-    @CooldownMinutes INT = 30,  -- Don't re-fire same alert within this window
-    @DebugMode BIT = 0          -- 1 = print alerts without sending email
+IF OBJECT_ID('[monitor].[usp_RunAlertEngine]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_RunAlertEngine] @CooldownMinutes INT=NULL, @DebugMode BIT=0 AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_RunAlertEngine]', 'P') IS NULL
+    EXEC('
+    CREATE PROCEDURE [monitor].[usp_RunAlertEngine]
+        @CooldownMinutes INT = 30,
+        @DebugMode BIT = 0
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        PRINT ''Placeholder - real body injected below'';
+    END;
+    ');
+GO
+
+ALTER PROCEDURE [monitor].[usp_RunAlertEngine]
+    @CooldownMinutes INT = 30,
+    @DebugMode BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON;

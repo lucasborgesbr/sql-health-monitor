@@ -73,7 +73,15 @@ GO
 ----------------------------------------------------------------------
 -- ALERT HISTORY SUMMARY VIEW
 ----------------------------------------------------------------------
-CREATE OR ALTER VIEW [monitor].[vw_AlertHistorySummary]
+IF OBJECT_ID('[monitor].[vw_AlertHistorySummary]', 'V') IS NOT NULL
+    EXEC('ALTER VIEW [monitor].[vw_AlertHistorySummary] AS SELECT 1 AS Dummy;');
+GO
+
+IF OBJECT_ID('[monitor].[vw_AlertHistorySummary]', 'V') IS NULL
+    EXEC('CREATE VIEW [monitor].[vw_AlertHistorySummary] AS SELECT 1 AS Dummy;');
+GO
+
+ALTER VIEW [monitor].[vw_AlertHistorySummary]
 AS
 SELECT
     MetricName,
@@ -92,7 +100,24 @@ GO
 ----------------------------------------------------------------------
 -- ACKNOWLEDGE ALERT PROCEDURE
 ----------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [monitor].[usp_Alert_Acknowledge]
+IF OBJECT_ID('[monitor].[usp_Alert_Acknowledge]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_Alert_Acknowledge] @AlertId BIGINT=NULL, @AcknowledgedBy NVARCHAR(128)=NULL AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_Alert_Acknowledge]', 'P') IS NULL
+    EXEC('
+    CREATE PROCEDURE [monitor].[usp_Alert_Acknowledge]
+        @AlertId BIGINT,
+        @AcknowledgedBy NVARCHAR(128) = NULL
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        PRINT ''Placeholder'';
+    END;
+    ');
+GO
+
+ALTER PROCEDURE [monitor].[usp_Alert_Acknowledge]
     @AlertId BIGINT,
     @AcknowledgedBy NVARCHAR(128) = NULL
 AS
@@ -116,7 +141,24 @@ GO
 ----------------------------------------------------------------------
 -- RESOLVE ALERT PROCEDURE
 ----------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [monitor].[usp_Alert_Resolve]
+IF OBJECT_ID('[monitor].[usp_Alert_Resolve]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_Alert_Resolve] @AlertId BIGINT=NULL, @Resolution NVARCHAR(500)=NULL AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_Alert_Resolve]', 'P') IS NULL
+    EXEC('
+    CREATE PROCEDURE [monitor].[usp_Alert_Resolve]
+        @AlertId BIGINT,
+        @Resolution NVARCHAR(500) = NULL
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        PRINT ''Placeholder'';
+    END;
+    ');
+GO
+
+ALTER PROCEDURE [monitor].[usp_Alert_Resolve]
     @AlertId BIGINT,
     @Resolution NVARCHAR(500) = NULL
 AS
