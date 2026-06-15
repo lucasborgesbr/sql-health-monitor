@@ -34,7 +34,7 @@ CREATE TABLE [monitor].[BaselineCapture] (
     CapturedBy      NVARCHAR(128)   NOT NULL DEFAULT SUSER_SNAME(),
     IsActive        BIT             NOT NULL DEFAULT 1,
     INDEX IX_BaselineCapture_Metric NONCLUSTERED (MetricName, CapturedAt DESC),
-    INDEX IX_BaselineCapture_Active NONCLUSTERED (IsActive, MetricName) INCLUDE (AvgValue, StdDevValue)
+    INDEX IX_BaselineCapture_Active NONCLUSTERED (IsActive, MetricName, AvgValue, StdDevValue)
 );
 GO
 
