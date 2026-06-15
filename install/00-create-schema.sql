@@ -337,7 +337,7 @@ GO
 IF OBJECT_ID('monitor.Incidents', 'U') IS NULL
 CREATE TABLE [monitor].[Incidents] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
-    IncidentId      UNIQUEIDENTIFIER DEFAULT NEWID(),
+    IncidentId      UNIQUEIDENTIFIER DEFAULT NEWID() UNIQUE,
     DetectedAt      DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
     ResolvedAt      DATETIME2     NULL,
     IncidentType    NVARCHAR(50)  NOT NULL,  -- Planned, Unplanned, Emergency
