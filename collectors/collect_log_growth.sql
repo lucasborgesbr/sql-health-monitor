@@ -185,9 +185,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_LogGrowth]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
     DECLARE @CurrentTime DATETIME2 = SYSUTCDATETIME();
     DECLARE @CriticalThreshold DECIMAL(5,2) = 90.0;  -- 90% usage
     DECLARE @WarningThreshold DECIMAL(5,2) = 80.0;   -- 80% usage

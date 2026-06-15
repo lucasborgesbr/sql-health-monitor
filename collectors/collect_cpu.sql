@@ -178,10 +178,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_CPU]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[CPUHistory]
         (SampleTime, TotalCPUms, SQLServerCPUms, SystemCPUms, 
          TopConsumerSPID, TopConsumerCPUms, TopConsumerQueryText)

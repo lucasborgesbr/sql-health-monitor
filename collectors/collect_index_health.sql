@@ -186,10 +186,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_IndexHealth]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[IndexHealthHistory]
         (DatabaseName, SchemaName, TableName, IndexName, 
          IndexType, FragmentationPercent, PageCount, FillFactor, 

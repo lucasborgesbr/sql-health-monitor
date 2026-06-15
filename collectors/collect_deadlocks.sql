@@ -185,9 +185,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
     DECLARE @CurrentTime DATETIME2 = SYSUTCDATETIME();
     DECLARE @DeadlockThreshold INT = 0;  -- Collect all deadlocks
     

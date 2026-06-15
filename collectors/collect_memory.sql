@@ -181,10 +181,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_Memory]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[MemoryHistory]
         (SampleTime, TotalMemoryMB, BufferPoolMB, CacheMemoryMB, 
          MemoryTargetMB, MemoryPressurePercent, PlanCacheMB, 

@@ -55,13 +55,6 @@ ALTER PROCEDURE [monitor].[usp_AlertAction_Execute]
     @CurrentValue DECIMAL(18,2),
     @Context NVARCHAR(500) = NULL,
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @ActionTaken NVARCHAR(MAX) = NULL;
 
     -- ============================================================
@@ -191,10 +184,6 @@ GO
     @CurrentValue DECIMAL(18,2),
     @Context NVARCHAR(500) = NULL,
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @ActionTaken NVARCHAR(MAX) = NULL;
 
     -- ============================================================

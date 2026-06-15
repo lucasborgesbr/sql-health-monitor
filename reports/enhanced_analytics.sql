@@ -104,9 +104,6 @@ ALTER PROCEDURE [monitor].[usp_EnhancedAnalytics]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @AnalysisStartTime DATETIME2 = DATEADD(HOUR, -@HoursBack, SYSUTCDATETIME());
@@ -461,9 +458,6 @@ BEGIN
     @MinExecutionCount INT = 10,
     @OutputFormat NVARCHAR(10) = 'Detailed',
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @AnalysisStartTime DATETIME2 = DATEADD(HOUR, -@HoursBack, SYSUTCDATETIME());

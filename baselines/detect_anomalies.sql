@@ -86,9 +86,6 @@ ALTER PROCEDURE [monitor].[usp_Baseline_DetectAnomalies]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @Since DATETIME2 = DATEADD(MINUTE, -@LookbackMinutes, SYSUTCDATETIME());
@@ -338,9 +335,6 @@ GO
     @LookbackMinutes INT = 60,
     @PersistResults  BIT = 1,
     @DebugMode       BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @Since DATETIME2 = DATEADD(MINUTE, -@LookbackMinutes, SYSUTCDATETIME());

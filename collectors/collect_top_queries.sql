@@ -185,10 +185,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_TopQueries]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Top queries by CPU usage
     INSERT INTO [monitor].[TopQueriesHistory]
         (SampleTime, DatabaseName, QueryText, QueryHash, 

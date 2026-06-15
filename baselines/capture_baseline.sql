@@ -86,9 +86,6 @@ ALTER PROCEDURE [monitor].[usp_Baseline_Capture]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartDate DATETIME2 = DATEADD(DAY, -@LookbackDays, SYSUTCDATETIME());
@@ -381,9 +378,6 @@ GO
     @LookbackDays   INT = 7,
     @DeactivateOld  BIT = 1,
     @DebugMode      BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartDate DATETIME2 = DATEADD(DAY, -@LookbackDays, SYSUTCDATETIME());

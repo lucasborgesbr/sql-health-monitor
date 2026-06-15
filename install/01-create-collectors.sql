@@ -28,10 +28,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_RunAllCollectors]
     @ForceRun BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Check master switch
     IF @ForceRun = 0
     BEGIN

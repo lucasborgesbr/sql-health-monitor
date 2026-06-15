@@ -82,13 +82,6 @@ GO
 ALTER PROCEDURE [monitor].[usp_Maintenance_UpdateBaselines]
     @LookbackDays INT = 28,  -- 4 weeks of data
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @StartDate DATETIME2 = DATEADD(DAY, -@LookbackDays, SYSUTCDATETIME());
     DECLARE @Now DATETIME2 = SYSUTCDATETIME();
 
@@ -235,10 +228,6 @@ GO
 
     @LookbackDays INT = 28,  -- 4 weeks of data
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @StartDate DATETIME2 = DATEADD(DAY, -@LookbackDays, SYSUTCDATETIME());
     DECLARE @Now DATETIME2 = SYSUTCDATETIME();
 

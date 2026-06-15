@@ -185,10 +185,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_JobHistory]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[JobHistory]
         (JobName, LastRunDate, LastRunStatus, LastRunDuration, NextRunDate, IsEnabled)
     SELECT

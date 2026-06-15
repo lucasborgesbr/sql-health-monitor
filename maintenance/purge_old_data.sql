@@ -112,9 +112,6 @@ ALTER PROCEDURE [monitor].[usp_PurgeHistoricalData]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartTime DATETIME2 = SYSUTCDATETIME();
@@ -347,9 +344,6 @@ GO
     @BatchSize      INT = 10000,
     @MaxDurationMin INT = 30,
     @DebugMode      BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartTime DATETIME2 = SYSUTCDATETIME();

@@ -183,10 +183,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_Blocking]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[BlockingHistory]
         (BlockedBySPID, BlockingSPID, WaitType, WaitTimeMs, QueryText, SessionLogin, BlockingQueryText, BlockingSessionLogin)
     SELECT

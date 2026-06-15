@@ -184,10 +184,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_AG_Health]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Only run if AG is configured
     IF NOT EXISTS (SELECT 1 FROM sys.availability_groups)
         RETURN;

@@ -186,10 +186,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_JobHistory]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Check if SQL Agent is available and enabled
     DECLARE @HasAgent BIT = 0;
     DECLARE @AgentVersion NVARCHAR(100);

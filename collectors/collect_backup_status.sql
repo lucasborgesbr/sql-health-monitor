@@ -187,10 +187,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_BackupStatus]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Get last backup for each database
     INSERT INTO [monitor].[BackupStatus]
         (DatabaseName, BackupType, LastBackupDate, BackupSizeMB, BackupDurationMinutes)

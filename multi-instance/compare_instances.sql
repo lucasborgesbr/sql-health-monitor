@@ -84,9 +84,6 @@ ALTER PROCEDURE [monitor].[usp_CompareInstances]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @Since DATETIME2 = DATEADD(HOUR, -@LookbackHours, SYSUTCDATETIME());
@@ -322,9 +319,6 @@ GO
     @LookbackHours  INT = 24,
     @DriftThreshold DECIMAL(5,2) = 25.0,
     @DebugMode      BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @Since DATETIME2 = DATEADD(HOUR, -@LookbackHours, SYSUTCDATETIME());

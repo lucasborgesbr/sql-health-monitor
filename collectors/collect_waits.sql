@@ -180,10 +180,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_Waits]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Current wait statistics
     INSERT INTO [monitor].[WaitHistory]
         (SampleTime, WaitType, WaitTimeMS, WaitCount, 

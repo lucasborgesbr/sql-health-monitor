@@ -184,10 +184,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_ErrorLog]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @LastCollected DATETIME2 = 
         ISNULL((SELECT MAX(LogDate) FROM [monitor].[ErrorLogHistory]), DATEADD(HOUR, -1, SYSUTCDATETIME()));
 

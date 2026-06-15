@@ -39,10 +39,6 @@ GO
 ALTER PROCEDURE [monitor].[usp_RunAlertEngine]
     @CooldownMinutes INT = 30,
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Delegates to the full alert engine procedure
     EXEC [monitor].[usp_AlertEngine_Check]
         @CooldownMinutes = @CooldownMinutes,

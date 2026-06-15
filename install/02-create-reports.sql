@@ -34,10 +34,6 @@ ALTER PROCEDURE [monitor].[usp_RunReport]
     @OverrideLanguage CHAR(5) = NULL,
     @OverrideRecipients NVARCHAR(500) = NULL,
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     DECLARE @ErrorMsg NVARCHAR(4000);
 
     BEGIN TRY

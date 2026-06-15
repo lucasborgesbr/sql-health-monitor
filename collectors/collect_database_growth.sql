@@ -189,10 +189,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     INSERT INTO [monitor].[DatabaseGrowthHistory]
         (DatabaseName, DataSizeMB, LogSizeMB, TotalSizeMB, 
          DataGrowthMB, LogGrowthMB, GrowthRatePercent, DaysSinceLastGrowth)

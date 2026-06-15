@@ -121,10 +121,6 @@ GO
 ALTER PROCEDURE [monitor].[usp_Alert_Acknowledge]
     @AlertId BIGINT,
     @AcknowledgedBy NVARCHAR(128) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     UPDATE [monitor].[AlertHistory]
     SET Acknowledged = 1,
         AcknowledgedBy = ISNULL(@AcknowledgedBy, SUSER_SNAME()),
@@ -163,10 +159,6 @@ GO
 ALTER PROCEDURE [monitor].[usp_Alert_Resolve]
     @AlertId BIGINT,
     @Resolution NVARCHAR(500) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     UPDATE [monitor].[AlertHistory]
     SET ResolvedAt = SYSUTCDATETIME(),
         Resolution = @Resolution,

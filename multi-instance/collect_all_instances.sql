@@ -94,9 +94,6 @@ ALTER PROCEDURE [monitor].[usp_CollectAllInstances]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartTime DATETIME2 = SYSUTCDATETIME();
@@ -273,9 +270,6 @@ GO
     @InstanceName   NVARCHAR(256) = NULL,
     @TimeoutSeconds INT = 60,
     @DebugMode      BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     DECLARE @StartTime DATETIME2 = SYSUTCDATETIME();

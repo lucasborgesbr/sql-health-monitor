@@ -98,9 +98,6 @@ ALTER PROCEDURE [monitor].[usp_GenerateWeeklyReport]
 AS
 BEGIN
     SET NOCOUNT ON;
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     -- ============================================================
@@ -525,9 +522,6 @@ GO
     @OverrideLanguage CHAR(5) = NULL,
     @OverrideRecipients NVARCHAR(500) = NULL,
     @DebugMode BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
     -- ============================================================

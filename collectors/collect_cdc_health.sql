@@ -185,10 +185,6 @@ GO
 
 ALTER PROCEDURE [monitor].[usp_Collect_CDC_Health]
     
-AS
-BEGIN
-    SET NOCOUNT ON;
-
     -- Only collect for databases with CDC enabled
     INSERT INTO [monitor].[CdcHealthHistory]
         (DatabaseName, CaptureJobStatus, CleanupJobStatus, 
