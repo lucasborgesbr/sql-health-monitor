@@ -16,6 +16,7 @@ GO
 IF OBJECT_ID('[monitor].[usp_RunReport]', 'P') IS NULL
     EXEC('
     CREATE PROCEDURE [monitor].[usp_RunReport]
+        
         @ReportType NVARCHAR(50) = ''Daily'',
         @OverrideLanguage CHAR(5) = NULL,
         @OverrideRecipients NVARCHAR(500) = NULL,

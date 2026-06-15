@@ -5,7 +5,181 @@
 USE [SQLHealthMonitor];
 GO
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_EvaluateAlerts]
+IF OBJECT_ID('[monitor].[usp_EvaluateAlerts]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_EvaluateAlerts]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_EvaluateAlerts]', 'P') IS NULL
+    
+        E
+        X
+        E
+        C
+        (
+        '
+        
+
+         
+         
+         
+         
+        C
+        R
+        E
+        A
+        T
+        E
+         
+        P
+        R
+        O
+        C
+        E
+        D
+        U
+        R
+        E
+         
+        [
+        m
+        o
+        n
+        i
+        t
+        o
+        r
+        ]
+        .
+        [
+        u
+        s
+        p
+        _
+        E
+        v
+        a
+        l
+        u
+        a
+        t
+        e
+        A
+        l
+        e
+        r
+        t
+        s
+        ]
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        
+
+         
+         
+         
+         
+        A
+        S
+        
+
+         
+         
+         
+         
+        B
+        E
+        G
+        I
+        N
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        S
+        E
+        T
+         
+        N
+        O
+        C
+        O
+        U
+        N
+        T
+         
+        O
+        N
+        ;
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        P
+        R
+        I
+        N
+        T
+         
+        '
+        '
+        P
+        l
+        a
+        c
+        e
+        h
+        o
+        l
+        d
+        e
+        r
+        '
+        '
+        ;
+        
+
+         
+         
+         
+         
+        E
+        N
+        D
+        ;
+        
+
+         
+         
+         
+         
+        '
+        )
+        ;
+        
+GO
+
+ALTER PROCEDURE [monitor].[usp_EvaluateAlerts]
+    
 AS
 BEGIN
     SET NOCOUNT ON;

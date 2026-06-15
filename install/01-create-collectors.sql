@@ -16,6 +16,7 @@ GO
 IF OBJECT_ID('[monitor].[usp_RunAllCollectors]', 'P') IS NULL
     EXEC('
     CREATE PROCEDURE [monitor].[usp_RunAllCollectors]
+        
         @ForceRun BIT = 0
     AS
     BEGIN

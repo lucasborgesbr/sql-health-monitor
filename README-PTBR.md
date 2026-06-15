@@ -12,7 +12,7 @@ O SQL Health Monitor é uma solução completa de monitoramento proativo para am
 
 ### 🎯 Benefícios Principais
 
-- **16 Coletores de Saúde** - Monitore CPU, memória, disco, waits, blocking, deadlocks, Availability Groups, CDC, top queries, saúde de índices, status de backup, jobs, error log, tempdb e crescimento de banco de dados
+- **17 Coletores de Saúde** - Monitore CPU, memória, disco, waits, blocking, deadlocks, Availability Groups, CDC, top queries, saúde de índices, status de backup, jobs, error log, tempdb, crescimento de banco de dados e rastreamento de uptime SLA
 - **Motor de Alertas Inteligente** - Limiares configuráveis com notificações em tempo real e períodos de resfriamento inteligentes
 - **Motor de Linha de Base Estatística** - Detecção automática de anomalias usando alertas baseados em desvio padrão
 - **Relatórios Completos** - Resumos diários de saúde, análises semanais profundas e notificações de alerta

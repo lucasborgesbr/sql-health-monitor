@@ -107,6 +107,7 @@ GO
 IF OBJECT_ID('[monitor].[usp_Alert_Acknowledge]', 'P') IS NULL
     EXEC('
     CREATE PROCEDURE [monitor].[usp_Alert_Acknowledge]
+        
         @AlertId BIGINT,
         @AcknowledgedBy NVARCHAR(128) = NULL
     AS
@@ -148,6 +149,7 @@ GO
 IF OBJECT_ID('[monitor].[usp_Alert_Resolve]', 'P') IS NULL
     EXEC('
     CREATE PROCEDURE [monitor].[usp_Alert_Resolve]
+        
         @AlertId BIGINT,
         @Resolution NVARCHAR(500) = NULL
     AS

@@ -25,6 +25,7 @@ GO
 IF OBJECT_ID('[monitor].[usp_RunAlertEngine]', 'P') IS NULL
     EXEC('
     CREATE PROCEDURE [monitor].[usp_RunAlertEngine]
+        
         @CooldownMinutes INT = 30,
         @DebugMode BIT = 0
     AS

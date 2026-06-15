@@ -2,7 +2,15 @@
 -- Provides current health status across all monitored metrics
 -- Updated: 2026-06-02 for release-ready version
 
-CREATE OR ALTER VIEW [monitor].[vw_CurrentHealth]
+IF OBJECT_ID('[monitor].[vw_CurrentHealth]', 'V') IS NOT NULL
+    EXEC('ALTER VIEW [monitor].[vw_CurrentHealth] AS SELECT 1 AS Dummy;');
+GO
+
+IF OBJECT_ID('[monitor].[vw_CurrentHealth]', 'V') IS NULL
+    EXEC('CREATE VIEW [monitor].[vw_CurrentHealth] AS SELECT 1 AS Dummy;');
+GO
+
+ALTER VIEW [monitor].[vw_CurrentHealth]
 AS
 SELECT
     ch.Id,

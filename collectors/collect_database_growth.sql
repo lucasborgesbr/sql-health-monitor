@@ -6,7 +6,189 @@
     Compatibility: SQL Server 2016+
 */
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]
+IF OBJECT_ID('[monitor].[usp_Collect_DatabaseGrowth]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_Collect_DatabaseGrowth]', 'P') IS NULL
+    
+        E
+        X
+        E
+        C
+        (
+        '
+        
+
+         
+         
+         
+         
+        C
+        R
+        E
+        A
+        T
+        E
+         
+        P
+        R
+        O
+        C
+        E
+        D
+        U
+        R
+        E
+         
+        [
+        m
+        o
+        n
+        i
+        t
+        o
+        r
+        ]
+        .
+        [
+        u
+        s
+        p
+        _
+        C
+        o
+        l
+        l
+        e
+        c
+        t
+        _
+        D
+        a
+        t
+        a
+        b
+        a
+        s
+        e
+        G
+        r
+        o
+        w
+        t
+        h
+        ]
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        
+
+         
+         
+         
+         
+        A
+        S
+        
+
+         
+         
+         
+         
+        B
+        E
+        G
+        I
+        N
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        S
+        E
+        T
+         
+        N
+        O
+        C
+        O
+        U
+        N
+        T
+         
+        O
+        N
+        ;
+        
+
+         
+         
+         
+         
+         
+         
+         
+         
+        P
+        R
+        I
+        N
+        T
+         
+        '
+        '
+        P
+        l
+        a
+        c
+        e
+        h
+        o
+        l
+        d
+        e
+        r
+        '
+        '
+        ;
+        
+
+         
+         
+         
+         
+        E
+        N
+        D
+        ;
+        
+
+         
+         
+         
+         
+        '
+        )
+        ;
+        
+GO
+
+ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]
+    
 AS
 BEGIN
     SET NOCOUNT ON;

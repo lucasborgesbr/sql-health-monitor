@@ -12,7 +12,7 @@ The SQL Health Monitor is a comprehensive proactive monitoring solution for SQL 
 
 ### 🎯 Key Benefits
 
-- **16 Health Collectors** - Monitor CPU, memory, disk, waits, blocking, deadlocks, Availability Groups, CDC, top queries, index health, backup status, jobs, error log, tempdb, and database growth
+- **17 Health Collectors** - Monitor CPU, memory, disk, waits, blocking, deadlocks, Availability Groups, CDC, top queries, index health, backup status, jobs, error log, tempdb, database growth, and uptime SLA tracking
 - **Intelligent Alert Engine** - Configurable thresholds with real-time notifications and intelligent cooldown periods
 - **Statistical Baseline Engine** - Automatic anomaly detection using standard deviation-based alerts
 - **Comprehensive Reporting** - Daily health summaries, weekly deep dives, and alert notifications
