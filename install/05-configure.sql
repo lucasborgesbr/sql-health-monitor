@@ -24,10 +24,12 @@ INSERT INTO [monitor].[Settings] (Category, SettingName, SettingValue, Descripti
 ('General', 'MonitoringEnabled', '1', 'Master switch for all monitoring', 'bool'),
 
 -- Email
-('Email', 'Recipients', 'dba@company.com', 'Comma-separated email recipients', 'string'),
-('Email', 'CcRecipients', '', 'CC recipients', 'string'),
-('Email', 'ProfileName', 'DBA_Mail', 'Database Mail profile name', 'string'),
-('Email', 'SubjectPrefix', '[SQL Health]', 'Email subject prefix', 'string'),
+('Email', 'ProfileName',       'DBA_Mail',        'Database Mail profile name (must exist in msdb)', 'string'),
+('Email', 'Recipients',        'dba@company.com',  'Default recipients for all reports (semicolon-separated)', 'string'),
+('Email', 'Recipients_Daily',  '',                 'Override recipients for daily report. Falls back to Email.Recipients if empty.', 'string'),
+('Email', 'Recipients_Weekly', '',                 'Override recipients for weekly report. Falls back to Email.Recipients if empty.', 'string'),
+('Email', 'Recipients_Alert',  '',                 'Override recipients for alert emails. Falls back to Email.Recipients if empty.', 'string'),
+('Email', 'CcRecipients',      '',                 'CC recipients (all report types)', 'string'),
 
 -- Schedule
 ('Schedule', 'DailyReportTime', '07:00', 'Time to send daily report (HH:mm)', 'string'),
