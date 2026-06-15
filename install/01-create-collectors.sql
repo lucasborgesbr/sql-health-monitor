@@ -9,8 +9,24 @@
 USE [SQLHealthMonitor];
 GO
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_RunAllCollectors]
-    @ForceRun BIT = 0  -- Ignore MonitoringEnabled setting
+IF OBJECT_ID('[monitor].[usp_RunAllCollectors]', 'P') IS NOT NULL
+    EXEC('ALTER PROCEDURE [monitor].[usp_RunAllCollectors] @ForceRun BIT = 0 AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+GO
+
+IF OBJECT_ID('[monitor].[usp_RunAllCollectors]', 'P') IS NULL
+    EXEC('
+    CREATE PROCEDURE [monitor].[usp_RunAllCollectors]
+        @ForceRun BIT = 0
+    AS
+    BEGIN
+        SET NOCOUNT ON;
+        PRINT ''Placeholder - real body injected below'';
+    END;
+    ');
+GO
+
+ALTER PROCEDURE [monitor].[usp_RunAllCollectors]
+    @ForceRun BIT = 0
 AS
 BEGIN
     SET NOCOUNT ON;
