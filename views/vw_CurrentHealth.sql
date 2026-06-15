@@ -43,7 +43,9 @@ SELECT
     ah.SyncHealth,
     
     -- Alert Status
-    CASE WHEN ah.AlertCount > 0 THEN 'ALERT'
+    CASE WHEN (SELECT COUNT(*) FROM [monitor].[AlertHistory]
+               WHERE FiredAt >= DATEADD(MINUTE, -60, SYSUTCDATETIME())
+                 AND Acknowledged = 0) > 0 THEN 'ALERT'
          ELSE 'OK' END AS OverallStatus
 FROM
     (SELECT TOP 1 * FROM [monitor].[CPUHistory] ORDER BY CollectedAt DESC) ch

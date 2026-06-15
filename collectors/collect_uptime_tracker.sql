@@ -117,43 +117,43 @@ BEGIN
     
     -- 2. Detect incidents from error log
     INSERT INTO #CriticalEvents (EventTime, EventType, Severity, Message, Source)
-    SELECT 
-        CAST(CAST(ntext AS DATETIME) AS DATETIME2) AS EventTime,
+    SELECT
+        eh.CollectedAt AS EventTime,
         'Error' AS EventType,
-        CASE 
-            WHEN severity IN (17, 19, 20, 21, 22, 23, 24, 25) THEN 'Critical'
-            WHEN severity IN (16, 18) THEN 'High'
-            WHEN severity BETWEEN 10 AND 15 THEN 'Medium'
-            ELSE 'Low'
+        CASE
+            WHEN eh.Severity = 'Critical' THEN 'Critical'
+            WHEN eh.Severity = 'Error'    THEN 'High'
+            ELSE 'Medium'
         END AS Severity,
-        message AS Message,
+        eh.ErrorMessage AS Message,
         'Error Log' AS Source
-    FROM sys.dm_os_ring_buffers
-    CROSS APPLY (SELECT CONVERT(NVARCHAR(MAX), record.value('(./RecordSource)[1]', 'nvarchar(100)')) AS ntext) AS t
-    WHERE ring_buffer_type = 'RING_BUFFER_ONLINE_DROPPED_EVENTS'
-    AND CAST(CAST(ntext AS DATETIME) AS DATETIME2) BETWEEN @StartTime AND @CurrentTime
-    AND CAST(CAST(ntext AS DATETIME) AS DATETIME2) IS NOT NULL;
+    FROM [monitor].[ErrorLogHistory] eh
+    WHERE eh.CollectedAt BETWEEN @StartTime AND @CurrentTime
+      AND eh.Severity IN ('Critical', 'Error');
     
     -- 3. Detect incidents from job failures
     INSERT INTO #DetectedIncidents (IncidentType, Category, Severity, Title, Description, DetectedAt, Source, SourceDetail)
-    SELECT 
+    SELECT
         'Unplanned' AS IncidentType,
         'Application' AS Category,
-        CASE 
-            WHEN severity = 1 THEN 'Critical'
-            WHEN severity = 2 THEN 'High'
-            WHEN severity = 3 THEN 'Medium'
+        CASE
+            WHEN jh.sql_severity >= 20 THEN 'Critical'
+            WHEN jh.sql_severity >= 17 THEN 'High'
+            WHEN jh.sql_severity >= 11 THEN 'Medium'
             ELSE 'Low'
         END AS Severity,
-        'Job Failure: ' + name AS Title,
-        'SQL Agent job failed: ' + name + ' Step: ' + step_name + ' Message: ' + message AS Description,
-        run_date AS DetectedAt,
+        'Job Failure: ' + j.name AS Title,
+        'SQL Agent job failed: ' + j.name + ' Step: ' + jh.step_name + ' Message: ' + jh.message AS Description,
+        CAST(CONVERT(CHAR(8), jh.run_date) + ' ' +
+             STUFF(STUFF(RIGHT('000000' + CAST(jh.run_time AS VARCHAR), 6), 5, 0, ':'), 3, 0, ':')
+             AS DATETIME2) AS DetectedAt,
         'SQL Agent' AS Source,
-        'Job: ' + name + ', Server: ' + @ServerName AS SourceDetail
-    FROM msdb.dbo.sysjobhistory
-    WHERE run_date >= CONVERT(INT, FORMAT(@StartTime, 'yyyyMMdd'))
-    AND run_status = 0 -- Failed
-    AND step_id > 0;
+        'Job: ' + j.name + ', Server: ' + @ServerName AS SourceDetail
+    FROM msdb.dbo.sysjobhistory jh
+    INNER JOIN msdb.dbo.sysjobs j ON jh.job_id = j.job_id
+    WHERE jh.run_date >= CONVERT(INT, FORMAT(@StartTime, 'yyyyMMdd'))
+    AND jh.run_status = 0 -- Failed
+    AND jh.step_id > 0;
     
     -- 4. Detect incidents from availability group failures
     IF EXISTS (SELECT 1 FROM sys.availability_groups)

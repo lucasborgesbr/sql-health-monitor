@@ -26,7 +26,7 @@ SELECT
     up.PeriodType,
     sl.TargetUptime,
     sl.ActualUptime,
-    sl.SLATrackingId,
+    sl.Id AS SLATrackingId,
     sl.SLAMet,
     sl.ViolationCount,
     sl.CriticalViolations,
@@ -70,7 +70,7 @@ SELECT
     AVG(up.UptimePercentage) AS AverageHourlyUptime,
     MAX(up.UptimePercentage) AS PeakUptime,
     MIN(up.UptimePercentage) AS LowestUptime,
-    COUNT(sl.SLATrackingId) AS SLAViolations,
+    COUNT(sl.Id) AS SLAViolations,
     SUM(sl.PenaltyMinutes) AS TotalPenaltyMinutes,
     CASE 
         WHEN SUM(up.UptimeMinutes) * 100.0 / SUM(up.TotalMinutes) >= 99.9 THEN 'COMPLIANT'
