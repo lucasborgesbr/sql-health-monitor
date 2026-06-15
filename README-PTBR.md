@@ -219,9 +219,35 @@ sql-health-monitor/
 ├── baselines/                       # Engine de baseline estatística
 ├── maintenance/                     # Retenção de dados e manutenção
 ├── views/                           # Views SQL para consulta
-├── multi-instance/                  # Gerenciamento centralizado
-├── linux-adaptation/                # Coletores adaptados para Linux
-└── docs/                            # Documentação
+├── multi-instance/                  # Gerenciamento centralizado multi-servidor
+│   ├── cms_tables.sql                # Servidores registrados + link com CMS
+│   ├── collect_all_instances.sql    # Coleta cross-instance
+│   ├── compare_instances.sql        # Detecção de drift
+│   └── register_sample.sql
+│
+├── linux-adaptation/                # Linux SQL Server: coletores + shell helpers
+│   ├── collect_cpu_linux.sql
+│   ├── collect_disk_linux.sql
+│   ├── collect_errorlog_linux.sql
+│   ├── collect_job_history_linux.sql
+│   ├── install-linux.sh              # Helper de deploy no Linux
+│   ├── run-collector.sh              # Executor por coletor no Linux
+│   ├── validate-installation.sh
+│   ├── ADAPTATION-SUMMARY.md
+│   ├── Linux-Compatibility-Report.md
+│   └── Linux-Implementation-Guide.md
+│
+├── views/                           # Views SQL para consulta direta
+│   ├── vw_CurrentHealth.sql
+│   └── vw_UptimeTracker.sql
+│
+├── config/                           # Configuração estática
+│   ├── settings.sql                  # Metadados de config (runtime fica em [monitor].[Settings])
+│   ├── languages.sql                  # Strings de UI: en, ptbr
+│   └── default.json                  # Legado — referência da era PS, substituído pela tabela Settings
+│
+└── validate_installation.sql         # Validação pré-instalação
+    validate_uptime_tracker.sql        # Validação pós-instalação do uptime
 ```
 
 ### Arquitetura dos relatórios

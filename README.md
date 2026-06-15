@@ -13,7 +13,7 @@ PowerShell is used **only** for deployment (`deploy/Install.ps1` runs the `.sql`
 
 ### Key Features
 
-- **18 Health Collectors** — CPU, memory, disk, waits, blocking, deadlocks, Availability Groups, CDC, top queries, index health, backup status, job history, TempDB, log growth, database growth, error log, file growth, uptime SLA
+- **18 Health Collectors**
 - **Alert Engine** — configurable thresholds with cooldown periods and alert history
 - **Statistical Baseline Engine** — anomaly detection using standard deviation
 - **HTML Reports via Database Mail** — daily health check and weekly deep dive; HTML built inside T-SQL procedures, sent via `sp_send_dbmail`
@@ -208,24 +208,6 @@ sql-health-monitor/
 │   └── Uninstall.sql                # Drop jobs + drop database
 │
 ├── collectors/                      # 18 T-SQL collection procedures
-│   ├── collect_cpu.sql
-│   ├── collect_memory.sql
-│   ├── collect_disk.sql
-│   ├── collect_waits.sql
-│   ├── collect_blocking.sql
-│   ├── collect_deadlocks.sql
-│   ├── collect_ag_health.sql
-│   ├── collect_cdc_health.sql
-│   ├── collect_top_queries.sql
-│   ├── collect_index_health.sql
-│   ├── collect_backup_status.sql
-│   ├── collect_job_history.sql
-│   ├── collect_tempdb.sql
-│   ├── collect_log_growth.sql
-│   ├── collect_database_growth.sql
-│   ├── collect_errorlog.sql
-│   ├── collect_uptime_tracker.sql
-│   └── (collect_database_growth.sql, collect_errorlog.sql...)
 │
 ├── reports/                         # Report procedures
 │   ├── html_builder_daily.sql       # usp_BuildDailyHtml  — pure HTML renderer (no DB queries)
@@ -251,23 +233,35 @@ sql-health-monitor/
 │   ├── retention_config.sql
 │   └── update_baselines.sql
 │
-├── views/                           # SQL views
+├── multi-instance/                  # Centralized multi-server management
+│   ├── cms_tables.sql                # Registered servers + CMS linkage
+│   ├── collect_all_instances.sql    # Cross-instance collection
+│   ├── compare_instances.sql        # Drift detection
+│   └── register_sample.sql
+│
+├── linux-adaptation/                # Linux SQL Server: collectors + shell helpers
+│   ├── collect_cpu_linux.sql
+│   ├── collect_disk_linux.sql
+│   ├── collect_errorlog_linux.sql
+│   ├── collect_job_history_linux.sql
+│   ├── install-linux.sh              # Linux deployment helper
+│   ├── run-collector.sh              # Per-collector runner for Linux
+│   ├── validate-installation.sh
+│   ├── ADAPTATION-SUMMARY.md
+│   ├── Linux-Compatibility-Report.md
+│   └── Linux-Implementation-Guide.md
+│
+├── views/                           # SQL views for direct querying
 │   ├── vw_CurrentHealth.sql
 │   └── vw_UptimeTracker.sql
 │
-├── multi-instance/                  # Central management
-│   ├── cms_tables.sql
-│   ├── register_sample.sql
-│   ├── collect_all_instances.sql
-│   └── compare_instances.sql
+├── config/                           # Static configuration
+│   ├── settings.sql                  # Settings metadata (runtime config lives in [monitor].[Settings])
+│   ├── languages.sql                  # UI strings: en, ptbr
+│   └── default.json                  # Legacy PS-era reference; superseded by Settings table
 │
-├── linux-adaptation/                # Linux-adapted collectors (T-SQL + OS-level helpers)
-│   └── ...
-│
-└── docs/                            # Documentation
-    ├── INSTALL.md
-    ├── CONFIGURATION.md
-    └── CUSTOMIZATION.md
+└── validate_installation.sql         # Pre-install validation
+    validate_uptime_tracker.sql        # Post-install uptime validation
 ```
 
 ### Report architecture
