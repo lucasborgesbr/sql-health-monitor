@@ -36,9 +36,14 @@ BEGIN
         CAST(ISNULL((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Page life expectancy'
                 AND object_name LIKE '%Buffer Manager%'), 0) AS INT) AS PageLifeExpectancy,
-        CAST(ISNULL((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
+        CAST(ISNULL(
+            (SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Buffer cache hit ratio'
-                AND object_name LIKE '%Buffer Manager%'), 0) AS DECIMAL(5,2)) AS BufferCacheHitRatio,
+                AND object_name LIKE '%Buffer Manager%') * 100.0
+            / NULLIF((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
+              WHERE counter_name = 'Buffer cache hit ratio base'
+                AND object_name LIKE '%Buffer Manager%'), 0)
+        , 0) AS DECIMAL(5,2)) AS BufferCacheHitRatio,
         CAST(ISNULL((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Memory Grants Pending'
                 AND object_name LIKE '%Memory Manager%'), 0) AS INT) AS MemoryGrantsPending;
