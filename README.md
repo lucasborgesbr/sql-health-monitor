@@ -48,7 +48,11 @@ The script runs each `.sql` file in order via `sqlcmd` and reports success/failu
 
 ### Option 2 — Manual (sqlcmd)
 
+> **Important:** Run all `sqlcmd` commands from the **repo root directory**. Install scripts use `:r` includes that resolve relative to the current working directory.
+
 ```bash
+cd C:\path\to\sql-health-monitor
+
 sqlcmd -S SQLSERVER01 -E -b -i install\00-create-schema.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\01-create-collectors.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\02-create-reports.sql

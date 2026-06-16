@@ -48,7 +48,11 @@ O script executa cada arquivo `.sql` em ordem via `sqlcmd` e reporta sucesso/fal
 
 ### Opção 2 — Manual (sqlcmd)
 
+> **Importante:** Execute todos os comandos `sqlcmd` a partir do **diretório raiz do repositório**. Os scripts de instalação usam diretivas `:r` que resolvem caminhos relativos ao diretório de trabalho atual.
+
 ```bash
+cd C:\caminho\para\sql-health-monitor
+
 sqlcmd -S SQLSERVER01 -E -b -i install\00-create-schema.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\01-create-collectors.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\02-create-reports.sql
