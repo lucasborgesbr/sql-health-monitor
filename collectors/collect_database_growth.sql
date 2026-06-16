@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Database Growth Collector
     Collects database size and growth trends.
     
@@ -7,267 +7,45 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_DatabaseGrowth]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_DatabaseGrowth]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        D
-        a
-        t
-        a
-        b
-        a
-        s
-        e
-        G
-        r
-        o
-        w
-        t
-        h
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_DatabaseGrowth] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_DatabaseGrowth]
-    
-    INSERT INTO [monitor].[DatabaseGrowthHistory]
-        (DatabaseName, DataSizeMB, LogSizeMB, TotalSizeMB, 
-         DataGrowthMB, LogGrowthMB, GrowthRatePercent, DaysSinceLastGrowth)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @CurrentTime DATETIME2 = SYSUTCDATETIME();
+
+    -- DatabaseGrowthHistory does not exist in the schema.
+    -- The closest matching table is [monitor].[FileGrowthHistory].
+    -- Schema columns: CollectedAt, DatabaseName, FileName, FileType,
+    --                 SizeMB, UsedMB, GrowthMB
+
+    -- Collect data file sizes per database file; GrowthMB is a delta computed in reporting.
+    INSERT INTO [monitor].[FileGrowthHistory]
+        (CollectedAt, DatabaseName, FileName, FileType, SizeMB, UsedMB, GrowthMB)
     SELECT
-        d.name AS DatabaseName,
-        CAST(FILEGROUPPROPERTY(d.data_space_id, 'FILEGROUP_SIZE') / 1024.0 / 1024.0 AS DECIMAL(10, 2)) AS DataSizeMB,
-        CAST((SELECT SUM(size) FROM sys.master_files mf 
-              WHERE mf.database_id = d.database_id 
-                AND mf.type = 1) / 1024.0 / 1024.0 AS DECIMAL(10, 2)) AS LogSizeMB,
-        CAST((SELECT SUM(size) FROM sys.master_files mf 
-              WHERE mf.database_id = d.database_id) / 1024.0 / 1024.0 AS DECIMAL(10, 2)) AS TotalSizeMB,
-        -- Calculate growth since last measurement (if history exists)
-        CASE WHEN EXISTS (
-            SELECT 1 FROM [monitor].[DatabaseGrowthHistory] h 
-            WHERE h.DatabaseName = d.name 
-              AND h.CollectTime > DATEADD(HOUR, -24, SYSDATETIME())
-        ) THEN (
-            SELECT CAST((SUM(size) / 1024.0 / 1024.0) - 
-                       (SELECT ISNULL(DataSizeMB + LogSizeMB, 0) 
-                        FROM [monitor].[DatabaseGrowthHistory] h2 
-                        WHERE h2.DatabaseName = d.name 
-                          AND h2.CollectTime = (
-                            SELECT MAX(CollectTime) 
-                            FROM [monitor].[DatabaseGrowthHistory] 
-                            WHERE DatabaseName = d.name
-                          )
-                       ) AS DECIMAL(10, 2))
-            FROM sys.master_files mf
-            WHERE mf.database_id = d.database_id
-        ) ELSE 0 END AS DataGrowthMB,
-        -- Log growth calculation
-        CASE WHEN EXISTS (
-            SELECT 1 FROM [monitor].[DatabaseGrowthHistory] h 
-            WHERE h.DatabaseName = d.name 
-              AND h.CollectTime > DATEADD(HOUR, -24, SYSDATETIME())
-        ) THEN (
-            SELECT CAST((SELECT SUM(size) FROM sys.master_files mf 
-                         WHERE mf.database_id = d.database_id AND mf.type = 1) / 1024.0 / 1024.0 - 
-                       (SELECT ISNULL(LogSizeMB, 0) 
-                        FROM [monitor].[DatabaseGrowthHistory] h2 
-                        WHERE h2.DatabaseName = d.name 
-                          AND h2.CollectTime = (
-                            SELECT MAX(CollectTime) 
-                            FROM [monitor].[DatabaseGrowthHistory] 
-                            WHERE DatabaseName = d.name
-                          )
-                       ) AS DECIMAL(10, 2))
-        ) ELSE 0 END AS LogGrowthMB,
-        -- Growth rate percentage
-        CASE WHEN EXISTS (
-            SELECT 1 FROM [monitor].[DatabaseGrowthHistory] h 
-            WHERE h.DatabaseName = d.name 
-              AND h.CollectTime > DATEADD(HOUR, -24, SYSDATETIME())
-        ) THEN (
-            SELECT CAST(((SUM(size) / 1024.0 / 1024.0) / 
-                        (SELECT ISNULL(DataSizeMB + LogSizeMB, 0) 
-                         FROM [monitor].[DatabaseGrowthHistory] h2 
-                         WHERE h2.DatabaseName = d.name 
-                           AND h2.CollectTime = (
-                             SELECT MAX(CollectTime) 
-                             FROM [monitor].[DatabaseGrowthHistory] 
-                             WHERE DatabaseName = d.name
-                           )
-                        ) - 1) * 100 AS DECIMAL(10, 2))
-            FROM sys.master_files mf
-            WHERE mf.database_id = d.database_id
-        ) ELSE 0 END AS GrowthRatePercent,
-        -- Days since last growth
-        CASE WHEN EXISTS (
-            SELECT 1 FROM [monitor].[DatabaseGrowthHistory] h 
-            WHERE h.DatabaseName = d.name 
-        ) THEN DATEDIFF(DAY, 
-            (SELECT MAX(CollectTime) 
-             FROM [monitor].[DatabaseGrowthHistory] 
-             WHERE DatabaseName = d.name),
-            SYSDATETIME()
-        ) ELSE NULL END AS DaysSinceLastGrowth
-    FROM sys.databases d
-    WHERE d.database_id > 4  -- Exclude system databases
+        @CurrentTime,
+        d.name                                                         AS DatabaseName,
+        mf.name                                                        AS FileName,
+        CASE mf.type WHEN 0 THEN 'ROWS' WHEN 1 THEN 'LOG' ELSE 'OTHER' END AS FileType,
+        CAST(mf.size / 128.0 AS BIGINT)                               AS SizeMB,
+        -- Used space: pages used from virtual file stats (bytes -> MB)
+        CAST(ISNULL(vfs.size_on_disk_bytes, 0) / 1024.0 / 1024.0 AS BIGINT) AS UsedMB,
+        -- Delta from previous collection is calculated in the reporting layer
+        NULL                                                           AS GrowthMB
+    FROM sys.master_files mf
+    INNER JOIN sys.databases d ON d.database_id = mf.database_id
+    LEFT JOIN sys.dm_io_virtual_file_stats(NULL, NULL) vfs
+        ON vfs.database_id = mf.database_id AND vfs.file_id = mf.file_id
+    WHERE mf.database_id > 4   -- Exclude system databases
       AND d.state_desc = 'ONLINE';
+
+    -- Note: DatabaseGrowthHistory table does not exist in the schema.
+    -- sys.databases does not have data_space_id; FILEGROUPPROPERTY() takes a name, not an int.
+    -- The original queries against those have been replaced with FileGrowthHistory inserts.
 END;
 GO

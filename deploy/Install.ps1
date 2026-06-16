@@ -91,7 +91,6 @@ $scripts  = @(
     "reports\html_builder_weekly.sql",
     "reports\daily_health_check.sql",
     "reports\weekly_deep_dive.sql",
-    "reports\enhanced_analytics.sql",
     "reports\recommendations_engine.sql",
     "alerts\alert_engine.sql",
     "alerts\alert_actions.sql",
@@ -124,7 +123,9 @@ foreach ($rel in $scripts) {
 
     Write-Host "  [$current/$total] $rel" -NoNewline
 
-    $cmdArgs = $baseArgs + @("-d", $Database, "-i", $path)
+    # First script creates the database — connect to master so the DB doesn't need to exist yet
+    $dbArg   = if ($current -eq 1) { @("-d", "master") } else { @("-d", $Database) }
+    $cmdArgs = $baseArgs + $dbArg + @("-i", $path)
     $output  = & sqlcmd @cmdArgs 2>&1
     $rc      = $LASTEXITCODE
 

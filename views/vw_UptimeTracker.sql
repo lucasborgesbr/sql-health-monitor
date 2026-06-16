@@ -80,8 +80,7 @@ SELECT
 FROM monitor.UptimePeriods up
 JOIN monitor.SLATracking sl ON up.PeriodStart = sl.PeriodStart AND up.PeriodEnd = sl.PeriodEnd
 WHERE up.PeriodType = 'Hourly'
-GROUP BY DATEFROMPARTS(YEAR(up.PeriodStart), MONTH(up.PeriodStart), 1)
-ORDER BY MonthStart DESC;
+GROUP BY DATEFROMPARTS(YEAR(up.PeriodStart), MONTH(up.PeriodStart), 1);
 GO
 
 -- Incident trends view
@@ -112,9 +111,8 @@ SELECT
     CONVERT(DATETIME, SWITCHOFFSET(CONVERT(DATETIMEOFFSET, GETDATE()), DATENAME(TZOFFSET, SYSDATETIME()))) AS ReportDate
 FROM monitor.Incidents i
 WHERE i.DetectedAt >= DATEADD(MONTH, -6, GETDATE()) -- Last 6 months
-GROUP BY DATEFROMPARTS(YEAR(i.DetectedAt), MONTH(i.DetectedAt), 1), 
-         i.IncidentType, i.Category, i.Severity
-ORDER BY MonthStart DESC, IncidentCount DESC;
+GROUP BY DATEFROMPARTS(YEAR(i.DetectedAt), MONTH(i.DetectedAt), 1),
+         i.IncidentType, i.Category, i.Severity;
 GO
 
 -- SLA compliance history view
@@ -144,8 +142,7 @@ SELECT
 FROM monitor.SLATracking sl
 WHERE sl.PeriodType = 'Hourly'
 AND sl.PeriodStart >= DATEADD(MONTH, -12, GETDATE()) -- Last 12 months
-GROUP BY DATEFROMPARTS(YEAR(sl.PeriodStart), MONTH(sl.PeriodStart), 1)
-ORDER BY MonthStart DESC;
+GROUP BY DATEFROMPARTS(YEAR(sl.PeriodStart), MONTH(sl.PeriodStart), 1);
 GO
 
 -- Active incidents view
@@ -192,8 +189,7 @@ SELECT
     END AS StatusIcon,
     CONVERT(DATETIME, SWITCHOFFSET(CONVERT(DATETIMEOFFSET, GETDATE()), DATENAME(TZOFFSET, SYSDATETIME()))) AS ReportDate
 FROM monitor.Incidents i
-WHERE i.DetectedAt >= DATEADD(DAY, -30, GETDATE()) -- Last 30 days
-ORDER BY i.DetectedAt DESC;
+WHERE i.DetectedAt >= DATEADD(DAY, -30, GETDATE()); -- Last 30 days
 GO
 
 -- Uptime dashboard view
@@ -220,7 +216,7 @@ SELECT
     
     -- SLA compliance
     (SELECT TOP 1 SLAStatus FROM monitor.vw_MonthlyUptimeSummary) AS CurrentSLAStatus,
-    (SELECT AVG(ActualUptime) FROM monitor.vw_SLAComplianceHistory) AS YearlyAverageUptime,
+    (SELECT AVG(AvgActualUptime) FROM monitor.vw_SLAComplianceHistory) AS YearlyAverageUptime,
     
     -- Server info
     @@SERVERNAME AS ServerName,

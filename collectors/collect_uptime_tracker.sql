@@ -164,15 +164,16 @@ BEGIN
             'Database' AS Category,
             'Critical' AS Severity,
             'AG Failure: ' + ag.name AS Title,
-            'Availability group ' + ag.name + ' in state ' + ar.replica_state_desc + 
-            ' on replica ' + ar.replica_server_name AS Description,
+            'Availability group ' + ag.name + ' in state ' + ars.role_desc +
+            ' on replica ' + rep.replica_server_name AS Description,
             @CurrentTime AS DetectedAt,
             'AlwaysOn' AS Source,
-            'AG: ' + ag.name + ', Replica: ' + ar.replica_server_name AS SourceDetail
+            'AG: ' + ag.name + ', Replica: ' + rep.replica_server_name AS SourceDetail
         FROM sys.availability_groups ag
-        JOIN sys.dm_hadr_availability_replica_states ar ON ag.group_id = ar.group_id
-        WHERE ar.replica_state_desc NOT IN ('SYNCHRONIZED', 'SYNCHRONIZING', 'SECONDARY_ALLOW_CONNECTIONS')
-        AND ar.replica_state_desc IS NOT NULL;
+        JOIN sys.dm_hadr_availability_replica_states ars ON ag.group_id = ars.group_id
+        JOIN sys.availability_replicas rep ON ars.replica_id = rep.replica_id
+        WHERE ars.operational_state_desc NOT IN ('ONLINE')
+        AND ars.operational_state_desc IS NOT NULL;
     END
     
     -- 5. Detect incidents from service availability (SQL Server service stopped)

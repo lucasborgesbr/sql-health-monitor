@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Deadlocks Collector
     Collects deadlock information from extended events with comprehensive analysis.
     
@@ -8,183 +8,16 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_Deadlocks]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_Deadlocks]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        D
-        e
-        a
-        d
-        l
-        o
-        c
-        k
-        s
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_Deadlocks] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
-    
+AS
+BEGIN
+    SET NOCOUNT ON;
     DECLARE @CurrentTime DATETIME2 = SYSUTCDATETIME();
     DECLARE @DeadlockThreshold INT = 0;  -- Collect all deadlocks
     
@@ -315,18 +148,18 @@ ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
         NULL AS DeadlockGraph,
         NEWID() AS DeadlockId,
         1 AS DeadlockCount,
-        r.blocked AS VictimSPID,
+        r.blocking_session_id AS VictimSPID,
         s.session_id AS VictimSession,
         DB_NAME(r.database_id) AS VictimDatabase,
-        OBJECT_NAME(r.object_id, r.database_id) AS VictimObject,
+        NULL AS VictimObject,
         r.wait_type AS VictimWaitType,
         r.wait_time / 1000.0 AS VictimWaitDurationMs,
         r.session_id AS BlockingSPID,
         bs.session_id AS BlockingSession,
         DB_NAME(bs.database_id) AS BlockingDatabase,
-        OBJECT_NAME(bs.object_id, bs.database_id) AS BlockingObject,
-        bs.wait_type AS BlockingWaitType,
-        bs.wait_time / 1000.0 AS BlockingDurationMs,
+        NULL AS BlockingObject,
+        br.wait_type AS BlockingWaitType,
+        br.wait_time / 1000.0 AS BlockingDurationMs,
         NULL AS TotalWaitTimeMs,
         NULL AS DeadlockCycleCount,
         NULL AS DeadlockResourceType,
@@ -339,9 +172,10 @@ ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
         0 AS IsWarning
     FROM sys.dm_exec_requests r
     JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
-    JOIN sys.dm_exec_requests br ON r.blocked = br.session_id
+    JOIN sys.dm_exec_requests br ON r.blocking_session_id = br.session_id
     JOIN sys.dm_exec_sessions bs ON br.session_id = bs.session_id
-    WHERE r.blocked IS NOT NULL
+    WHERE r.blocking_session_id IS NOT NULL
+      AND r.blocking_session_id > 0
       AND r.wait_type LIKE 'LATCH%' OR r.wait_type LIKE 'LOCK%'
       AND r.wait_time > 5000  -- Wait more than 5 seconds
       AND r.session_id > 50  -- Exclude system sessions
@@ -350,13 +184,13 @@ ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
     -- Update extended events session status
     MERGE INTO [monitor].[XESessionStatus] AS target
     USING (
-        SELECT 
+        SELECT
             name AS SessionName,
-            CAST(event_count AS BIGINT) AS EventCount,
-            CAST(target_memory_kb AS BIGINT) AS MemoryUsedKB,
-            CAST(max_memory_kb AS BIGINT) AS MaxMemoryKB,
-            start_time AS StartTime,
-            last_processing_time AS LastEventTime
+            CAST(dropped_event_count AS BIGINT) AS EventCount,
+            NULL AS MemoryUsedKB,
+            NULL AS MaxMemoryKB,
+            create_time AS StartTime,
+            NULL AS LastEventTime
         FROM sys.dm_xe_sessions
     ) AS source
     ON target.SessionName = source.SessionName
@@ -378,22 +212,46 @@ ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
         (PatternHash, FirstOccurrence, LastOccurrence, OccurrenceCount, AvgFrequencyHours,
          CommonWaitTypes, CommonObjects, CommonDatabases, Recommendation)
     SELECT
-        CAST(SUM(CAST(DeadlockId AS BINARY(8))) AS BINARY(8)) AS PatternHash,
+        CAST(CHECKSUM_AGG(CHECKSUM(CAST(d.DeadlockDate AS NVARCHAR(30)))) AS BINARY(8)) AS PatternHash,
         MIN(DeadlockDate) AS FirstOccurrence,
         MAX(DeadlockDate) AS LastOccurrence,
         COUNT(*) AS OccurrenceCount,
         NULL AS AvgFrequencyHours,
-        STRING_AGG(DISTINCT VictimWaitType, ', ') WITHIN GROUP (ORDER BY VictimWaitType) AS CommonWaitTypes,
-        STRING_AGG(DISTINCT VictimObject, ', ') WITHIN GROUP (ORDER BY VictimObject) AS CommonObjects,
-        STRING_AGG(DISTINCT VictimDatabase, ', ') WITHIN GROUP (ORDER BY VictimDatabase) AS CommonDatabases,
+        STUFF((SELECT DISTINCT ', ' + d2.VictimWaitType
+               FROM [monitor].[DeadlockHistory] d2
+               WHERE d2.DeadlockDate >= DATEADD(HOUR,-24,@CurrentTime)
+                 AND DATEPART(YEAR,d2.DeadlockDate)=DATEPART(YEAR,d.DeadlockDate)
+                 AND DATEPART(MONTH,d2.DeadlockDate)=DATEPART(MONTH,d.DeadlockDate)
+                 AND DATEPART(DAY,d2.DeadlockDate)=DATEPART(DAY,d.DeadlockDate)
+                 AND DATEPART(HOUR,d2.DeadlockDate)=DATEPART(HOUR,d.DeadlockDate)
+                 AND d2.VictimWaitType IS NOT NULL
+               FOR XML PATH(''),TYPE).value('.','NVARCHAR(MAX)'),1,2,'') AS CommonWaitTypes,
+        STUFF((SELECT DISTINCT ', ' + d2.VictimObject
+               FROM [monitor].[DeadlockHistory] d2
+               WHERE d2.DeadlockDate >= DATEADD(HOUR,-24,@CurrentTime)
+                 AND DATEPART(YEAR,d2.DeadlockDate)=DATEPART(YEAR,d.DeadlockDate)
+                 AND DATEPART(MONTH,d2.DeadlockDate)=DATEPART(MONTH,d.DeadlockDate)
+                 AND DATEPART(DAY,d2.DeadlockDate)=DATEPART(DAY,d.DeadlockDate)
+                 AND DATEPART(HOUR,d2.DeadlockDate)=DATEPART(HOUR,d.DeadlockDate)
+                 AND d2.VictimObject IS NOT NULL
+               FOR XML PATH(''),TYPE).value('.','NVARCHAR(MAX)'),1,2,'') AS CommonObjects,
+        STUFF((SELECT DISTINCT ', ' + d2.VictimDatabase
+               FROM [monitor].[DeadlockHistory] d2
+               WHERE d2.DeadlockDate >= DATEADD(HOUR,-24,@CurrentTime)
+                 AND DATEPART(YEAR,d2.DeadlockDate)=DATEPART(YEAR,d.DeadlockDate)
+                 AND DATEPART(MONTH,d2.DeadlockDate)=DATEPART(MONTH,d.DeadlockDate)
+                 AND DATEPART(DAY,d2.DeadlockDate)=DATEPART(DAY,d.DeadlockDate)
+                 AND DATEPART(HOUR,d2.DeadlockDate)=DATEPART(HOUR,d.DeadlockDate)
+                 AND d2.VictimDatabase IS NOT NULL
+               FOR XML PATH(''),TYPE).value('.','NVARCHAR(MAX)'),1,2,'') AS CommonDatabases,
         'Review application design and consider adding proper indexes and transaction isolation levels' AS Recommendation
-    FROM [monitor].[DeadlockHistory]
-    WHERE DeadlockDate >= DATEADD(HOUR, -24, @CurrentTime)
-    GROUP BY 
-        DATEPART(YEAR, DeadlockDate), 
-        DATEPART(MONTH, DeadlockDate), 
-        DATEPART(DAY, DeadlockDate),
-        DATEPART(HOUR, DeadlockDate);
+    FROM [monitor].[DeadlockHistory] d
+    WHERE d.DeadlockDate >= DATEADD(HOUR, -24, @CurrentTime)
+    GROUP BY
+        DATEPART(YEAR,d.DeadlockDate),
+        DATEPART(MONTH,d.DeadlockDate),
+        DATEPART(DAY,d.DeadlockDate),
+        DATEPART(HOUR,d.DeadlockDate);
     
     PRINT '✓ Deadlock statistics collected successfully';
 END;

@@ -7,6 +7,16 @@
     Author: Lucas Borges
 */
 
+USE [master];
+GO
+
+IF DB_ID('SQLHealthMonitor') IS NULL
+BEGIN
+    CREATE DATABASE [SQLHealthMonitor];
+    PRINT 'Created database SQLHealthMonitor.';
+END
+GO
+
 USE [SQLHealthMonitor];
 GO
 

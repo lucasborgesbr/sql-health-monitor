@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Backup Status Collector
     Collects backup history, last backup dates, and backup types.
     
@@ -7,225 +7,41 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_BackupStatus]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_BackupStatus]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_BackupStatus] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_BackupStatus]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        B
-        a
-        c
-        k
-        u
-        p
-        S
-        t
-        a
-        t
-        u
-        s
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_BackupStatus] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_BackupStatus]
-    
-    -- Get last backup for each database
-    INSERT INTO [monitor].[BackupStatus]
-        (DatabaseName, BackupType, LastBackupDate, BackupSizeMB, BackupDurationMinutes)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Schema columns: CollectedAt, DatabaseName, BackupType (CHAR(1): D/I/L),
+    --                 LastBackupDate, BackupSizeMB, CompressedSizeMB, DurationSeconds
+    -- One row per database per backup type (D, I, L)
+    INSERT INTO [monitor].[BackupHistory]
+        (DatabaseName, BackupType, LastBackupDate, BackupSizeMB, CompressedSizeMB, DurationSeconds)
     SELECT
-        d.name AS DatabaseName,
-        CASE b.type
-            WHEN 'D' THEN 'Full'
-            WHEN 'I' THEN 'Differential'
-            WHEN 'L' THEN 'Log'
-            WHEN 'F' THEN 'File'
-            ELSE 'Unknown'
-        END AS BackupType,
-        CASE WHEN b.backup_finish_date > 0 THEN
-            CONVERT(DATETIME2, b.backup_finish_date)
-        END AS LastBackupDate,
-        CASE WHEN b.backup_size > 0 THEN
-            CAST(b.backup_size / 1024.0 / 1024.0 AS DECIMAL(10, 2))
-        END AS BackupSizeMB,
-        CASE WHEN b.backup_finish_date > b.backup_start_date AND b.backup_finish_date > 0 THEN
-            DATEDIFF(MINUTE, b.backup_start_date, b.backup_finish_date)
-        END AS BackupDurationMinutes
+        d.name                                                          AS DatabaseName,
+        b.type                                                          AS BackupType,
+        CONVERT(DATETIME2, b.backup_finish_date)                       AS LastBackupDate,
+        CAST(b.backup_size / 1024.0 / 1024.0 AS BIGINT)               AS BackupSizeMB,
+        CAST(b.compressed_backup_size / 1024.0 / 1024.0 AS BIGINT)    AS CompressedSizeMB,
+        DATEDIFF(SECOND, b.backup_start_date, b.backup_finish_date)    AS DurationSeconds
     FROM sys.databases d
-    LEFT JOIN msdb.dbo.backupset b ON b.database_name = d.name
-        AND b.type IN ('D', 'I', 'L', 'F')
-        AND b.type <> 'D'  -- Exclude differential backups that don't have backupset row
-        AND b.is_differential = 0
-        AND b.is_copy_only = 0
-        AND b.server_name = @@SERVERNAME
-        AND b.backup_finish_date = (
-            SELECT MAX(b2.backup_finish_date)
-            FROM msdb.dbo.backupset b2
-            WHERE b2.database_name = d.name
-              AND b2.type IN ('D', 'I', 'L', 'F')
-              AND b2.type <> 'D'
-              AND b2.is_differential = 0
-              AND b2.is_copy_only = 0
-              AND b2.server_name = @@SERVERNAME
-        )
-    WHERE d.database_id > 4  -- Exclude system databases
+    CROSS APPLY (
+        SELECT TOP 1 bs.type, bs.backup_finish_date, bs.backup_start_date,
+                     bs.backup_size, bs.compressed_backup_size
+        FROM msdb.dbo.backupset bs
+        WHERE bs.database_name = d.name
+          AND bs.type IN ('D', 'I', 'L')
+          AND bs.is_copy_only = 0
+          AND bs.server_name = @@SERVERNAME
+        ORDER BY bs.backup_finish_date DESC
+    ) b
+    WHERE d.database_id > 4
       AND d.state_desc = 'ONLINE';
 END;
 GO

@@ -91,7 +91,7 @@ PRINT '  - monitor.usp_Generate_MonthlyUptimeReport procedure';
 PRINT '  - 6 uptime tracking views';
 PRINT '';
 PRINT 'Usage:';
-PRINT '  -- Run uptime tracker collection (hourly)');
+PRINT '  -- Run uptime tracker collection (hourly)';
 PRINT '  EXEC monitor.usp_Collect_UptimeTracker;';
 PRINT '';
 PRINT '  -- Generate monthly report';

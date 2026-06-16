@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Error Log Collector
     Collects recent error log entries (errors and warnings only).
     
@@ -7,182 +7,17 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_ErrorLog]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_ErrorLog]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_ErrorLog] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_ErrorLog]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        E
-        r
-        r
-        o
-        r
-        L
-        o
-        g
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_ErrorLog] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_ErrorLog]
-    
+AS
+BEGIN
+    SET NOCOUNT ON;
+
     DECLARE @LastCollected DATETIME2 = 
         ISNULL((SELECT MAX(LogDate) FROM [monitor].[ErrorLogHistory]), DATEADD(HOUR, -1, SYSUTCDATETIME()));
 

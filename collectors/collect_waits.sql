@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Waits Collector
     Collects wait statistics and system bottlenecks.
     
@@ -7,197 +7,29 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_Waits]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_Waits]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_Waits] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_Waits]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        W
-        a
-        i
-        t
-        s
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_Waits] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_Waits]
-    
-    -- Current wait statistics
-    INSERT INTO [monitor].[WaitHistory]
-        (SampleTime, WaitType, WaitTimeMS, WaitCount, 
-         PercentTotalWaits, AverageWaitTimeMS, DatabaseName, 
-         SessionID, QueryText)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Schema columns: CollectedAt, WaitType, WaitingTasksCount, WaitTimeMs,
+    --                 SignalWaitTimeMs, DeltaWaitTimeMs
+    INSERT INTO [monitor].[WaitStatsHistory]
+        (WaitType, WaitingTasksCount, WaitTimeMs, SignalWaitTimeMs, DeltaWaitTimeMs)
     SELECT
-        SYSDATETIME() AS SampleTime,
-        ws.wait_type AS WaitType,
-        ws.wait_time_ms AS WaitTimeMS,
-        ws.waiting_tasks_count AS WaitCount,
-        NULL AS PercentTotalWaits,  -- Calculated in application layer
-        CASE WHEN ws.waiting_tasks_count > 0 THEN ws.wait_time_ms / ws.waiting_tasks_count ELSE 0 END AS AverageWaitTimeMS,
-        NULL AS DatabaseName,
-        NULL AS SessionID,
-        NULL AS QueryText
+        ws.wait_type          AS WaitType,
+        ws.waiting_tasks_count AS WaitingTasksCount,
+        ws.wait_time_ms        AS WaitTimeMs,
+        ws.signal_wait_time_ms AS SignalWaitTimeMs,
+        NULL                   AS DeltaWaitTimeMs  -- Delta calculated externally or in reporting layer
     FROM sys.dm_os_wait_stats ws
     WHERE ws.wait_type NOT IN (
-        -- Filter out common waits that aren't problematic
         'BROKER_EVENTHANDLER', 'BROKER_RECEIVE_WAITFOR', 'BROKER_TASK_STOP',
         'BROKER_TO_FLUSH', 'BROKER_TRANSMITTER', 'CHECKPOINT_QUEUE',
         'CHKPT', 'CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'CLR_SEMAPHORE',
@@ -218,22 +50,9 @@ ALTER PROCEDURE [monitor].[usp_Collect_Waits]
         'XE_TIMER_DISPATCHER'
     )
       AND ws.wait_time_ms > 0
-      AND ws.waiting_tasks_count > 0
-    ORDER BY ws.wait_time_ms DESC;
-    
-    -- Wait statistics by database
-    INSERT INTO [monitor].[WaitDatabaseHistory]
-        (SampleTime, DatabaseName, WaitType, WaitTimeMS, WaitCount)
-    SELECT
-        SYSDATETIME() AS SampleTime,
-        DB_NAME(qs.database_id) AS DatabaseName,
-        ws.wait_type AS WaitType,
-        ws.wait_time_ms AS WaitTimeMS,
-        ws.waiting_tasks_count AS WaitCount
-    FROM sys.dm_exec_requests qs
-    INNER JOIN sys.dm_os_wait_stats ws ON qs.wait_type = ws.wait_type
-    WHERE qs.database_id > 4  -- Exclude system databases
-      AND qs.wait_type IS NOT NULL
-      AND qs.wait_time_ms > 0;
+      AND ws.waiting_tasks_count > 0;
+
+    -- Note: WaitHistory and WaitDatabaseHistory tables do not exist in the schema;
+    -- the per-database breakdown insert has been removed.
 END;
 GO

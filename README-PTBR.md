@@ -1,7 +1,7 @@
 # SQL Health Monitor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![SQL Server](https://img.shields.io/badge/SQL%20Server-2016%2B-green.svg)](https://www.microsoft.com/sql-server/)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2012%2B-green.svg)](https://www.microsoft.com/sql-server/)
 
 > **English version:** [README.md](README.md)
 
@@ -25,7 +25,7 @@ O PowerShell é usado **apenas** para deploy (`deploy/Install.ps1` executa os ar
 
 | Componente | Requisito |
 |------------|-----------|
-| SQL Server | 2016+ (otimizado para 2022) |
+| SQL Server | 2012+ (otimizado para 2022) |
 | SQL Server Agent | Obrigatório para os jobs agendados |
 | Database Mail | Obrigatório para envio de relatórios e alertas |
 | Permissões | `sysadmin` recomendado; `db_owner` mínimo |

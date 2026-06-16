@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - Monthly Uptime Report Generator
     Generates comprehensive monthly uptime reports with SLA analysis.
     
@@ -180,7 +180,7 @@ BEGIN
         END AS Impact
     FROM monitor.UptimePeriods
     WHERE PeriodStart >= @PeriodStart AND PeriodStart < @PeriodEnd
-    GROUP BY SUM(DowntimeMinutes);
+    ;
     
     -- Critical incident recommendations
     INSERT INTO #Recommendations (Category, Issue, Recommendation, Priority, Impact)
@@ -193,7 +193,7 @@ BEGIN
     FROM monitor.Incidents
     WHERE Severity = 'Critical'
     AND DetectedAt >= @PeriodStart AND DetectedAt < @PeriodEnd
-    GROUP BY COUNT(*);
+    ;
     
     -- Planned maintenance optimization
     INSERT INTO #Recommendations (Category, Issue, Recommendation, Priority, Impact)
@@ -206,7 +206,7 @@ BEGIN
     FROM monitor.Incidents
     WHERE IncidentType = 'Planned'
     AND DetectedAt >= @PeriodStart AND DetectedAt < @PeriodEnd
-    GROUP BY COUNT(*);
+    ;
     
     -- Network-related incident recommendations
     INSERT INTO #Recommendations (Category, Issue, Recommendation, Priority, Impact)
@@ -219,7 +219,7 @@ BEGIN
     FROM monitor.Incidents
     WHERE Category = 'Network'
     AND DetectedAt >= @PeriodStart AND DetectedAt < @PeriodEnd
-    GROUP BY COUNT(*);
+    ;
     
     -- Generate the monthly uptime report
     DECLARE @ReportTitle NVARCHAR(500) = 'Monthly Uptime Report - ' + @ServerName + ' - ' + FORMAT(@ReportMonth, 'MMMM yyyy');

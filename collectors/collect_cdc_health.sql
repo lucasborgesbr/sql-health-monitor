@@ -1,4 +1,4 @@
-/*
+﻿/*
     SQL Health Monitor - CDC Health Collector
     Collects CDC capture/cleanup job status and latency.
     
@@ -7,184 +7,17 @@
 */
 
 IF OBJECT_ID('[monitor].[usp_Collect_CDC_Health]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_CDC_Health]  AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_Collect_CDC_Health] AS SET NOCOUNT ON; BEGIN DECLARE @Dummy INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_Collect_CDC_Health]', 'P') IS NULL
-    
-        E
-        X
-        E
-        C
-        (
-        '
-        
-
-         
-         
-         
-         
-        C
-        R
-        E
-        A
-        T
-        E
-         
-        P
-        R
-        O
-        C
-        E
-        D
-        U
-        R
-        E
-         
-        [
-        m
-        o
-        n
-        i
-        t
-        o
-        r
-        ]
-        .
-        [
-        u
-        s
-        p
-        _
-        C
-        o
-        l
-        l
-        e
-        c
-        t
-        _
-        C
-        D
-        C
-        _
-        H
-        e
-        a
-        l
-        t
-        h
-        ]
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        
-
-         
-         
-         
-         
-        A
-        S
-        
-
-         
-         
-         
-         
-        B
-        E
-        G
-        I
-        N
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        S
-        E
-        T
-         
-        N
-        O
-        C
-        O
-        U
-        N
-        T
-         
-        O
-        N
-        ;
-        
-
-         
-         
-         
-         
-         
-         
-         
-         
-        P
-        R
-        I
-        N
-        T
-         
-        '
-        '
-        P
-        l
-        a
-        c
-        e
-        h
-        o
-        l
-        d
-        e
-        r
-        '
-        '
-        ;
-        
-
-         
-         
-         
-         
-        E
-        N
-        D
-        ;
-        
-
-         
-         
-         
-         
-        '
-        )
-        ;
-        
+    EXEC('CREATE PROCEDURE [monitor].[usp_Collect_CDC_Health] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
 ALTER PROCEDURE [monitor].[usp_Collect_CDC_Health]
-    
+AS
+BEGIN
+    SET NOCOUNT ON;
+
     -- Only collect for databases with CDC enabled
     INSERT INTO [monitor].[CdcHealthHistory]
         (DatabaseName, CaptureJobStatus, CleanupJobStatus, 
@@ -193,16 +26,14 @@ ALTER PROCEDURE [monitor].[usp_Collect_CDC_Health]
         d.name AS DatabaseName,
         CASE 
             WHEN cj.enabled = 1 THEN 
-                CASE WHEN ja_cap.run_status = 4 THEN 'Running'
-                     WHEN ja_cap.run_status = 1 THEN 'Idle'
-                     ELSE 'Stopped' END
+                CASE WHEN ja_cap.start_execution_date IS NOT NULL AND ja_cap.stop_execution_date IS NULL THEN 'Running'
+                     ELSE 'Idle' END
             ELSE 'Disabled'
         END AS CaptureJobStatus,
         CASE 
             WHEN clj.enabled = 1 THEN
-                CASE WHEN ja_cln.run_status = 4 THEN 'Running'
-                     WHEN ja_cln.run_status = 1 THEN 'Idle'
-                     ELSE 'Stopped' END
+                CASE WHEN ja_cln.start_execution_date IS NOT NULL AND ja_cln.stop_execution_date IS NULL THEN 'Running'
+                     ELSE 'Idle' END
             ELSE 'Disabled'
         END AS CleanupJobStatus,
         DATEDIFF(SECOND, 
