@@ -25,7 +25,7 @@ GO
 --------------------------------------------------------------
 PRINT '';
 PRINT '[1/4] Deploying uptime tracker collector...';
-:r ..\collectors\collect_uptime_tracker.sql
+:r collectors\collect_uptime_tracker.sql
 GO
 
 --------------------------------------------------------------
@@ -33,7 +33,7 @@ GO
 --------------------------------------------------------------
 PRINT '';
 PRINT '[2/4] Deploying monthly uptime report generator...';
-:r ..\reports\monthly_uptime_report.sql
+:r reports\monthly_uptime_report.sql
 GO
 
 --------------------------------------------------------------
@@ -41,7 +41,7 @@ GO
 --------------------------------------------------------------
 PRINT '';
 PRINT '[3/4] Deploying uptime tracker views...';
-:r ..\views\vw_UptimeTracker.sql
+:r views\vw_UptimeTracker.sql
 GO
 
 --------------------------------------------------------------

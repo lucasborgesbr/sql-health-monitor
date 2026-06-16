@@ -112,6 +112,9 @@ $total   = $scripts.Count
 $current = 0
 $errors  = 0
 
+# sqlcmd resolves :r paths relative to CWD — must run from repo root
+Push-Location $repoRoot
+
 foreach ($rel in $scripts) {
     $current++
     $path = Join-Path $repoRoot $rel
@@ -139,6 +142,8 @@ foreach ($rel in $scripts) {
 }
 
 Write-Host ""
+Pop-Location
+
 if ($errors -eq 0) {
     Write-Host "Deployment complete. $total scripts executed, 0 errors." -ForegroundColor Green
     Write-Host ""
