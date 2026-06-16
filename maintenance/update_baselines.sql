@@ -193,6 +193,9 @@ BEGIN
     -- ============================================================
     -- MERGE INTO BASELINES TABLE
     -- ============================================================
+    -- Skip metrics with no data
+    DELETE FROM @NewBaselines WHERE AvgVal IS NULL OR SampleCount = 0;
+
     MERGE [monitor].[PerformanceBaselines] AS target
     USING @NewBaselines AS source ON target.MetricName = source.MetricName
     WHEN MATCHED THEN

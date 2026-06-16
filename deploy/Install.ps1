@@ -97,6 +97,7 @@ $scripts  = @(
     "baselines\capture_baseline.sql",
     "baselines\detect_anomalies.sql",
     "maintenance\purge_old_data.sql",
+    "maintenance\update_baselines.sql",
     "views\vw_CurrentHealth.sql",
     "views\vw_UptimeTracker.sql"
 )

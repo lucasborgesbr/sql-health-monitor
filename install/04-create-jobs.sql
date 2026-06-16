@@ -208,7 +208,7 @@ EXEC msdb.dbo.sp_add_jobstep
     @step_name = N'Purge Old Data',
     @step_id = 1,
     @subsystem = N'TSQL',
-    @command = N'EXEC [monitor].[usp_Maintenance_PurgeOldData];',
+    @command = N'EXEC [monitor].[usp_PurgeHistoricalData];',
     @database_name = N'SQLHealthMonitor',
     @on_success_action = 1,
     @on_fail_action = 2;
