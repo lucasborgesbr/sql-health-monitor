@@ -27,7 +27,8 @@ GO
 IF OBJECT_ID('monitor.usp_Collect_UptimeTracker', 'P') IS NOT NULL
     DROP PROCEDURE [monitor].[usp_Collect_UptimeTracker];
 GO
-
+SET QUOTED_IDENTIFIER ON;
+GO
 CREATE PROCEDURE [monitor].[usp_Collect_UptimeTracker]
     @ServerName NVARCHAR(128) = @@SERVERNAME,
     @Environment NVARCHAR(50) = 'PRODUCTION'
@@ -176,16 +177,8 @@ BEGIN
         AND ars.operational_state_desc IS NOT NULL;
     END
     
-    -- 5. Detect incidents from service availability (SQL Server service stopped)
-    INSERT INTO #CriticalEvents (EventTime, EventType, Severity, Message, Source)
-    SELECT 
-        @CurrentTime AS EventTime,
-        'Service Unavailable' AS EventType,
-        'Critical' AS Severity,
-        'SQL Server service appears to be unavailable or stopped' AS Message,
-        'Service Monitor' AS Source
-    WHERE NOT EXISTS (SELECT 1 FROM sys.dm_os_system_memory WHERE total_physical_memory_kb > 0);
-    
+    -- 5. (sys.dm_os_system_memory not available on SQL 2014; service availability check skipped)
+
     -- 6. Detect incidents from deadlock traces
     IF EXISTS (SELECT 1 FROM sys.dm_xe_sessions WHERE name = 'system_health')
     BEGIN
@@ -235,15 +228,15 @@ BEGIN
     DECLARE @CriticalIncidents INT = 0;
     
     -- Calculate downtime based on incidents
-    SELECT 
-        @IncidentMinutes = SUM(DATEDIFF(MINUTE, 
+    SELECT
+        @IncidentMinutes = ISNULL(SUM(DATEDIFF(MINUTE,
             CASE WHEN i.DetectedAt < @PeriodStart THEN @PeriodStart ELSE i.DetectedAt END,
-            CASE 
-                WHEN i.ResolvedAt IS NULL THEN @PeriodEnd 
-                WHEN i.ResolvedAt > @PeriodEnd THEN @PeriodEnd 
-                ELSE i.ResolvedAt 
+            CASE
+                WHEN i.ResolvedAt IS NULL THEN @PeriodEnd
+                WHEN i.ResolvedAt > @PeriodEnd THEN @PeriodEnd
+                ELSE i.ResolvedAt
             END
-        ))
+        )), 0)
     FROM monitor.Incidents i
     WHERE i.IsResolved = 0
     AND i.DetectedAt < @PeriodEnd

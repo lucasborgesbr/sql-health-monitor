@@ -26,13 +26,13 @@ BEGIN
     SELECT
         CAST((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Total Server Memory (KB)'
-                AND object_name LIKE '%Memory Manager%') / 1024.0 AS BIGINT) AS TotalServerMemoryMB,
+                AND object_name LIKE '%Memory Manager%') / 1024 AS BIGINT) AS TotalServerMemoryMB,
         CAST((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Target Server Memory (KB)'
-                AND object_name LIKE '%Memory Manager%') / 1024.0 AS BIGINT) AS TargetServerMemoryMB,
+                AND object_name LIKE '%Memory Manager%') / 1024 AS BIGINT) AS TargetServerMemoryMB,
         CAST((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Free Memory (KB)'
-                AND object_name LIKE '%Memory Manager%') / 1024.0 AS BIGINT) AS AvailableMemoryMB,
+                AND object_name LIKE '%Memory Manager%') / 1024 AS BIGINT) AS AvailableMemoryMB,
         CAST(ISNULL((SELECT TOP 1 cntr_value FROM sys.dm_os_performance_counters
               WHERE counter_name = 'Page life expectancy'
                 AND object_name LIKE '%Buffer Manager%'), 0) AS INT) AS PageLifeExpectancy,

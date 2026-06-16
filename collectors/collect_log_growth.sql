@@ -25,7 +25,15 @@ BEGIN
     -- Schema columns: CollectedAt, DatabaseName, FileName, FileType,
     --                 SizeMB, UsedMB, GrowthMB
 
-    -- Collect log file size and usage from sys.master_files + dm_db_log_space_usage
+    -- Collect log space usage via DBCC SQLPERF (SQL 2012+, works cross-database)
+    CREATE TABLE #LogSpace (
+        DatabaseName NVARCHAR(128),
+        LogSizeMB    DECIMAL(15,2),
+        LogUsedPct   DECIMAL(15,2),
+        Status       INT
+    );
+    INSERT INTO #LogSpace EXEC('DBCC SQLPERF(LOGSPACE) WITH NO_INFOMSGS');
+
     INSERT INTO [monitor].[FileGrowthHistory]
         (CollectedAt, DatabaseName, FileName, FileType, SizeMB, UsedMB, GrowthMB)
     SELECT
@@ -33,15 +41,17 @@ BEGIN
         d.name                                                       AS DatabaseName,
         mf.name                                                      AS FileName,
         'LOG'                                                        AS FileType,
-        CAST(mf.size / 128.0 AS BIGINT)                             AS SizeMB,
-        NULL                                                         AS UsedMB, -- log_space_used_percent requires per-DB context
-        -- Delta from previous collection (NULL; calculated in reporting layer)
+        CAST(mf.size / 128 AS BIGINT)                               AS SizeMB,
+        CAST(ls.LogSizeMB * ls.LogUsedPct / 100.0 AS BIGINT)       AS UsedMB,
         NULL                                                         AS GrowthMB
     FROM sys.master_files mf
     INNER JOIN sys.databases d ON d.database_id = mf.database_id
-    WHERE mf.type = 1           -- Log files only
-      AND mf.database_id > 4   -- Exclude system databases
+    LEFT  JOIN #LogSpace ls    ON ls.DatabaseName = d.name
+    WHERE mf.type = 1
+      AND mf.database_id > 4
       AND d.state_desc = 'ONLINE';
+
+    DROP TABLE #LogSpace;
 
     -- Note: LogGrowthHistory and LogBackupHistory tables do not exist in the schema.
     -- sys.master_files does not have last_auto_growth_at / last_auto_growth_size_mb columns;

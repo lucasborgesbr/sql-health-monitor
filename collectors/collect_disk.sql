@@ -20,33 +20,46 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @CurrentTime DATETIME2 = SYSUTCDATETIME();
 
-    -- Schema columns: CollectedAt, DriveLetter, TotalSpaceMB, FreeSpaceMB, UsedPct,
-    --                 AvgReadLatencyMs, AvgWriteLatencyMs
-    -- sys.master_files does NOT have free_space_percent; use dm_io_virtual_file_stats for I/O
-    -- and derive drive letter from physical_name.
+    -- Get real disk total/free via sys.dm_os_volume_stats (SQL 2008 R2+)
+    -- One row per unique volume; deduplicate by taking one file per drive letter.
+    ;WITH VolStats AS (
+        SELECT DISTINCT
+            LEFT(mf.physical_name, 1)                              AS DriveLetter,
+            vs.total_bytes / 1048576                               AS TotalMB,
+            vs.available_bytes / 1048576                           AS FreeMB
+        FROM sys.master_files mf
+        CROSS APPLY sys.dm_os_volume_stats(mf.database_id, mf.file_id) vs
+        WHERE mf.state = 0
+    ),
+    DedupVol AS (
+        SELECT DriveLetter, MAX(TotalMB) AS TotalMB, MAX(FreeMB) AS FreeMB
+        FROM VolStats
+        GROUP BY DriveLetter
+    )
     INSERT INTO [monitor].[DiskHistory]
         (CollectedAt, DriveLetter, TotalSpaceMB, FreeSpaceMB, UsedPct,
          AvgReadLatencyMs, AvgWriteLatencyMs)
     SELECT
         @CurrentTime,
-        LEFT(mf.physical_name, 3)                                     AS DriveLetter,
-        CAST(SUM(mf.size) / 128.0 AS BIGINT)                          AS TotalSpaceMB,
-        -- FreeSpaceMB not directly available; set NULL (populated externally or via xp_fixeddrives)
-        NULL                                                           AS FreeSpaceMB,
-        -- UsedPct not directly available without OS-level data; set NULL
-        NULL                                                           AS UsedPct,
+        LEFT(mf.physical_name, 1)                                     AS DriveLetter,
+        dv.TotalMB                                                    AS TotalSpaceMB,
+        dv.FreeMB                                                     AS FreeSpaceMB,
+        CASE WHEN dv.TotalMB = 0 THEN NULL
+             ELSE CAST((dv.TotalMB - dv.FreeMB) * 100.0 / dv.TotalMB AS DECIMAL(5,2))
+        END                                                            AS UsedPct,
         AVG(CASE WHEN vfs.num_of_reads > 0
-                 THEN CAST(vfs.io_stall_read_ms AS DECIMAL(10,2)) / vfs.num_of_reads
+                 THEN CAST(vfs.io_stall_read_ms AS FLOAT) / vfs.num_of_reads
                  ELSE NULL END)                                        AS AvgReadLatencyMs,
         AVG(CASE WHEN vfs.num_of_writes > 0
-                 THEN CAST(vfs.io_stall_write_ms AS DECIMAL(10,2)) / vfs.num_of_writes
+                 THEN CAST(vfs.io_stall_write_ms AS FLOAT) / vfs.num_of_writes
                  ELSE NULL END)                                        AS AvgWriteLatencyMs
     FROM sys.master_files mf
     JOIN sys.dm_io_virtual_file_stats(NULL, NULL) vfs
         ON mf.database_id = vfs.database_id AND mf.file_id = vfs.file_id
-    WHERE mf.database_id > 4   -- Exclude system databases
-      AND mf.state = 0          -- ONLINE
-    GROUP BY LEFT(mf.physical_name, 3);
+    JOIN DedupVol dv ON dv.DriveLetter = LEFT(mf.physical_name, 1)
+    WHERE mf.database_id > 4
+      AND mf.state = 0
+    GROUP BY LEFT(mf.physical_name, 1), dv.TotalMB, dv.FreeMB;
 
     -- Note: DiskHistoryDetailed and DiskIoWaits tables do not exist in the schema;
     -- those inserts have been removed.

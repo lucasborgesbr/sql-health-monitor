@@ -14,6 +14,8 @@ GO
 IF OBJECT_ID('[monitor].[usp_Collect_Deadlocks]', 'P') IS NULL
     EXEC('CREATE PROCEDURE [monitor].[usp_Collect_Deadlocks] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
+SET QUOTED_IDENTIFIER ON;
+GO
 ALTER PROCEDURE [monitor].[usp_Collect_Deadlocks]
 AS
 BEGIN
@@ -72,26 +74,7 @@ BEGIN
             1 AS IsCritical,
             0 AS IsWarning
         WHERE 1 = 0;  -- Placeholder for actual deadlock extraction
-        
-        -- Extract deadlock wait statistics
-        INSERT INTO [monitor].[DeadlockWaitStats]
-            (DeadlockId, CollectedAt, WaitType, WaitingTasksCount, WaitTimeMs, SignalWaitTimeMs,
-             ResourceType, ResourceName, DatabaseName, ObjectName, IndexName)
-        SELECT
-            NULL AS DeadlockId,  -- Would need to correlate with deadlock events
-            @CurrentTime,
-            ws.wait_type,
-            ws.waiting_tasks_count,
-            ws.wait_time_ms,
-            ws.signal_wait_time_ms,
-            NULL AS ResourceType,
-            NULL AS ResourceName,
-            NULL AS DatabaseName,
-            NULL AS ObjectName,
-            NULL AS IndexName
-        FROM sys.dm_os_wait_stats ws
-        WHERE ws.wait_type LIKE 'DEADLOCK%' OR ws.wait_type LIKE 'LATCH%'
-          AND ws.waiting_tasks_count > 0;
+        -- DeadlockWaitStats requires a correlated DeadlockId; skipped here (no real deadlock rows inserted above)
     END;
     
     -- Method 2: Use system views for recent deadlock detection

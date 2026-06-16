@@ -13,6 +13,8 @@ GO
 IF OBJECT_ID('[monitor].[usp_Collect_CPU]', 'P') IS NULL
     EXEC('CREATE PROCEDURE [monitor].[usp_Collect_CPU] AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
+SET QUOTED_IDENTIFIER ON;
+GO
 ALTER PROCEDURE [monitor].[usp_Collect_CPU]
 AS
 BEGIN

@@ -36,7 +36,8 @@ GO
 IF OBJECT_ID('[monitor].[usp_Maintenance_UpdateBaselines]', 'P') IS NULL
     EXEC('CREATE PROCEDURE [monitor].[usp_Maintenance_UpdateBaselines] @LookbackDays INT = 28, @DebugMode BIT = 0 AS SET NOCOUNT ON; PRINT ''Placeholder'';');
 GO
-
+SET QUOTED_IDENTIFIER ON;
+GO
 ALTER PROCEDURE [monitor].[usp_Maintenance_UpdateBaselines]
     @LookbackDays INT = 28,
     @DebugMode    BIT = 0

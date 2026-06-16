@@ -18,36 +18,39 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Only collect for databases with CDC enabled
+    -- Skip entirely if no databases have CDC enabled
+    IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE is_cdc_enabled = 1)
+    BEGIN
+        PRINT 'CDC not enabled on any database — skipping collection.';
+        RETURN;
+    END
+
+    -- cdc.lsn_time_mapping is per-database and cannot be cross-DB queried directly;
+    -- LatencySeconds/MinLsn/MaxLsn are left NULL — populate via dynamic SQL if needed.
     INSERT INTO [monitor].[CdcHealthHistory]
-        (DatabaseName, CaptureJobStatus, CleanupJobStatus, 
+        (DatabaseName, CaptureJobStatus, CleanupJobStatus,
          LatencySeconds, MinLsn, MaxLsn, RetentionMinutes)
     SELECT
         d.name AS DatabaseName,
-        CASE 
-            WHEN cj.enabled = 1 THEN 
+        CASE
+            WHEN cj.enabled = 1 THEN
                 CASE WHEN ja_cap.start_execution_date IS NOT NULL AND ja_cap.stop_execution_date IS NULL THEN 'Running'
                      ELSE 'Idle' END
             ELSE 'Disabled'
         END AS CaptureJobStatus,
-        CASE 
+        CASE
             WHEN clj.enabled = 1 THEN
                 CASE WHEN ja_cln.start_execution_date IS NOT NULL AND ja_cln.stop_execution_date IS NULL THEN 'Running'
                      ELSE 'Idle' END
             ELSE 'Disabled'
         END AS CleanupJobStatus,
-        DATEDIFF(SECOND, 
-            (SELECT MAX(tran_end_time) FROM cdc.lsn_time_mapping WITH (NOLOCK) 
-             WHERE tran_id <> 0x00),
-            SYSUTCDATETIME()
-        ) AS LatencySeconds,
-        CONVERT(NVARCHAR(50), sys.fn_cdc_get_min_lsn('dbo_dummy')) AS MinLsn,
-        CONVERT(NVARCHAR(50), sys.fn_cdc_get_max_lsn()) AS MaxLsn,
-        ct.retention AS RetentionMinutes
+        NULL AS LatencySeconds,
+        NULL AS MinLsn,
+        NULL AS MaxLsn,
+        NULL AS RetentionMinutes
     FROM sys.databases d
-    INNER JOIN sys.change_tracking_databases ct ON ct.database_id = d.database_id
-    LEFT JOIN msdb.dbo.sysjobs cj ON cj.name LIKE 'cdc.' + d.name + '_capture'
-    LEFT JOIN msdb.dbo.sysjobs clj ON clj.name LIKE 'cdc.' + d.name + '_cleanup'
+    LEFT JOIN msdb.dbo.sysjobs cj  ON cj.name  = 'cdc.' + d.name + '_capture'
+    LEFT JOIN msdb.dbo.sysjobs clj ON clj.name = 'cdc.' + d.name + '_cleanup'
     LEFT JOIN msdb.dbo.sysjobactivity ja_cap ON ja_cap.job_id = cj.job_id
         AND ja_cap.session_id = (SELECT MAX(session_id) FROM msdb.dbo.syssessions)
     LEFT JOIN msdb.dbo.sysjobactivity ja_cln ON ja_cln.job_id = clj.job_id
