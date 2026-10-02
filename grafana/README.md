@@ -1,167 +1,157 @@
-# Grafana Dashboard for SQL Health Monitor
+# Grafana Dashboards
 
-Dashboard JSON e queries para visualização no Grafana.
+SQL Health Monitor supports two Grafana integration options:
 
-## Arquivos
+## Option 1: Direct MSSQL (Recommended for single instance)
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `dashboards/sql-health-monitor.json` | Dashboard pronto para importar no Grafana |
-| `queries/influxdb_queries.sql` | Queries SQL para coleta de dados |
-| `telegraf.conf` | Configuração exemplo do Telegraf |
+Uses Grafana's built-in MSSQL datasource for direct SQL Server queries.
 
-## Opções de Integração
+### Setup
 
-### Opção 1: InfluxDB + Telegraf (Recomendado)
+1. **Add MSSQL Datasource in Grafana:**
+   ```
+   Settings → Connections → Data sources → Add data source → Microsoft SQL Server
+   ```
 
-1. **Instale o InfluxDB** v2.x
-2. **Instale o Telegraf**
-3. **Configure o Telegraf** com o SQL Server input:
+2. **Configuration:**
+   - Host: `sqlserver:1433` (or your server)
+   - Database: `SQLHealthMonitor`
+   - Authentication: Windows Authentication or SQL Authentication
+   - TLS/SSL: Enable if required
 
-```toml
-# telegraf.conf
+3. **Import Dashboard:**
+   ```
+   Dashboards → Import → Upload sql-health-monitor-direct.json
+   ```
 
-[[outputs.influxdb_v2]]
-  urls = ["http://localhost:8086"]
-  token = "your-token"
-  organization = "your-org"
-  bucket = "sql-health"
+4. **Set Variables:**
+   - `DS_MSSQL`: Select your MSSQL datasource
 
-[[inputs.sqlserver]]
-  servers = [
-    "Server=SQLSERVER01;Database=SQLHealthMonitor;appname=telegraf;Integrated Security=SSPI;",
-  ]
-  query_version = "18"
-  
-  # Queries customizadas
-  [[inputs.sqlserver.query]]
-    measurement_name = "sql_health"
-    query = """SELECT ... suas queries aqui ..."""
-```
+### Files
+- `sql-health-monitor-direct.json` - Full dashboard with all panels
+- Uses `$__timeFilter()` macro for time-based filtering
 
-4. **Importe o dashboard**:
-   - No Grafana: Dashboards → Import
-   - Carregue o arquivo `sql-health-monitor.json`
-   - Selecione o datasource InfluxDB
+---
 
-### Opção 2: Prometheus + sql_exporter
+## Option 2: Prometheus (Recommended for multi-instance)
 
-1. **Instale o sql_exporter**
-2. **Configure queries** no formato Prometheus:
+Exports metrics in Prometheus exposition format for scraping.
 
-```yaml
-# queries.yml
-metrics:
-  - name: sql_health_cpu
-    help: "SQL Server CPU percentage"
-    values:
-      - cpu_pct
-    query: |
-      SELECT SqlCpuPct AS cpu_pct 
-      FROM [monitor].[CpuHistory] 
-      ORDER BY CollectedAt DESC OFFSET 0 ROWS FETCH NEXT 1 ROW ONLY
+### Prerequisites
 
-  - name: sql_health_ple
-    help: "Page Life Expectancy in seconds"
-    values:
-      - ple_seconds
-    query: |
-      SELECT PageLifeExpectancy AS ple_seconds 
-      FROM [monitor].[MemoryHistory] 
-      ORDER BY CollectedAt DESC OFFSET 0 ROWS FETCH NEXT 1 ROW ONLY
-```
+You need one of:
+- [sql_exporter](https://github.com/burningalchemist/sql_exporter) - Go-based exporter
+- [prometheus-sql-exporter](https://github.com/trevorallan/prometheus-sql-exporter) - Python-based
+- [mSSQL_exporter](https://github.com/dbhi/mssql_exporter) - Prometheus exporter for MSSQL
 
-3. **Adicione ao prometheus.yml**:
+### Setup
+
+1. **Configure Exporter:**
+   Use `queries/prometheus_queries.sql` as reference for metric definitions.
+
+   Example `queries.yml` for sql_exporter:
+   ```yaml
+   queries:
+     - name: "sql_health_metrics"
+       help: "SQL Health Monitor metrics"
+       values:
+         - cpu_pct
+         - ple_seconds
+         - blocked_sessions
+         - active_sessions
+       query: |
+         SELECT
+           (SELECT TOP 1 SqlCpuPct FROM [SQLHealthMonitor].[monitor].[CpuHistory] ORDER BY CollectedAt DESC) AS cpu_pct,
+           (SELECT TOP 1 PageLifeExpectancy FROM [SQLHealthMonitor].[monitor].[MemoryHistory] ORDER BY CollectedAt DESC) AS ple_seconds,
+           (SELECT TOP 1 BlockedSessions FROM [SQLHealthMonitor].[monitor].[SessionHistory] ORDER BY CollectedAt DESC) AS blocked_sessions,
+           (SELECT TOP 1 ActiveSessions FROM [SQLHealthMonitor].[monitor].[SessionHistory] ORDER BY CollectedAt DESC) AS active_sessions
+   ```
+
+2. **Add Prometheus Datasource:**
+   ```
+   Settings → Connections → Data sources → Add data source → Prometheus
+   ```
+
+3. **Import Dashboard:**
+   ```
+   Dashboards → Import → Upload sql-health-monitor-prometheus.json
+   ```
+
+4. **Set Variables:**
+   - `DS_PROMETHEUS`: Select your Prometheus datasource
+   - `server`: Filter by instance (auto-populated from labels)
+
+### Available Prometheus Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `sql_health_cpu_sql_pct` | gauge | server | SQL Server CPU % |
+| `sql_health_cpu_system_pct` | gauge | server | System CPU % |
+| `sql_health_ple_seconds` | gauge | server | Page Life Expectancy |
+| `sql_health_buffer_cache_hit_ratio` | gauge | server | Buffer cache hit ratio |
+| `sql_health_memory_grants_pending` | gauge | server | Pending memory grants |
+| `sql_health_total_server_memory_mb` | gauge | server | Total server memory MB |
+| `sql_health_sql_server_memory_mb` | gauge | server | SQL Server memory MB |
+| `sql_health_disk_used_pct` | gauge | server, drive | Disk usage % |
+| `sql_health_disk_free_space_mb` | gauge | server, drive | Free disk space MB |
+| `sql_health_disk_read_latency_ms` | gauge | server, drive | Read latency ms |
+| `sql_health_disk_write_latency_ms` | gauge | server, drive | Write latency ms |
+| `sql_health_active_sessions` | gauge | server | Active sessions |
+| `sql_health_blocked_sessions` | gauge | server | Blocked sessions |
+| `sql_health_waiting_tasks` | gauge | server | Waiting tasks |
+| `sql_health_wait_time_ms` | gauge | server, wait_type | Wait time ms |
+| `sql_health_waiting_tasks_count` | gauge | server, wait_type | Tasks waiting |
+| `sql_health_ag_synchronized` | gauge | server, ag_name, replica | AG sync status |
+| `sql_health_ag_sync_health` | gauge | server, ag_name, replica | AG health % |
+| `sql_health_ag_send_queue_kb` | gauge | server, ag_name, replica | AG send queue KB |
+| `sql_health_ag_redo_queue_kb` | gauge | server, ag_name, replica | AG redo queue KB |
+| `sql_health_backup_hours_since_full` | gauge | server, database | Hours since full backup |
+| `sql_health_backup_hours_since_log` | gauge | server, database | Hours since log backup |
+| `sql_health_job_failed_count` | gauge | server, job_name | Failed job runs |
+| `sql_health_job_last_outcome` | gauge | server, job_name | Last job outcome (0/1) |
+| `sql_health_alert_count_total` | counter | server, severity, alert_name | Total alerts |
+| `sql_health_findings_critical` | gauge | server | Critical findings 24h |
+| `sql_health_findings_warning` | gauge | server | Warning findings 24h |
+| `sql_health_findings_info` | gauge | server | Info findings 24h |
+
+---
+
+## Comparison
+
+| Feature | Direct MSSQL | Prometheus |
+|---------|--------------|------------|
+| Setup complexity | Low | Medium |
+| Multi-instance support | Manual per server | Built-in (label filtering) |
+| Performance | Direct query | Scraped metrics |
+| Historical data | From SQL tables | From Prometheus |
+| Alerting integration | Grafana alerts | Native Prometheus alerts |
+| Resource usage | Per-query | Exporter sidecar |
+
+---
+
+## Prometheus Scrape Config
+
+Example `prometheus.yml`:
 ```yaml
 scrape_configs:
-  - job_name: 'sql-health'
+  - job_name: 'sql-health-monitor'
     static_configs:
-      - targets: ['localhost:9399']
+      - targets: ['sql-exporter:9399']
+    metrics_path: /metrics
+    scrape_interval: 60s
 ```
 
-### Opção 3: Direct MSSQL (Grafana 10+)
-
-O Grafana 10+ suporta SQL Server diretamente:
-
-1. **Adicione datasource**: SQL Server (mssql)
-2. **Crie painéis** com queries direto no Grafana
-
-## Dashboard Painéis
-
-### Overview
-- **CPU Usage %** - Utilização do SQL Server
-- **Page Life Expectancy** - Tempo de vida das páginas em buffer
-- **Blocking Sessions** - Sessões bloqueando outras
-- **Hours Since Backup** - Horas desde último backup
-
-### CPU & Performance
-- CPU usage histórico
-- Batch Requests/sec
-- Compilations/Recompilations
-
-### Memory & Buffer
-- Page Life Expectancy histórico
-- Buffer Cache Hit Ratio
-- Memory Grants Pending
-
-### Disk & Storage
-- Disk Space % por drive
-- Read/Write Latency (ms)
-- Combined Latency
-
-### Wait Statistics
-- Top 5 Wait Types por tempo
-- Tabela de Waits atuais
-- Signal Wait %
-
-### Availability & Backups
-- Status de AGs
-- Histórico de backups
-- Tempo desde último backup
-
-### Sessions & Connections
-- Active Sessions histórico
-- Blocked Sessions
-- Waiting Tasks
-
-### Alerts
-- Alertas por severidade
-- Tendência de alertas
-
-## Variáveis de Template
-
-O dashboard usa variáveis para filtro:
-
-| Variável | Valores | Descrição |
-|----------|---------|-----------|
-| DS_INFLUXDB | Datasources | Datasource do InfluxDB |
-
-## Customização
-
-### Adicionar Servidor
-Edite a variável `ServerName` nas queries do Telegraf.
-
-### Ajustar Thresholds
-Os thresholds estão definidos nos painéis. Edite diretamente no JSON ou no Grafana.
-
-### Adicionar Métricas
-1. Adicione query no Telegraf
-2. Adicione painel no dashboard
-3. Referencie a measurement nova
-
-## Troubleshooting
-
-### Sem dados no Dashboard
-1. Verifique se o Telegraf está rodando: `telegraf --test`
-2. Teste queries direto no InfluxDB
-3. Verifique se o bucket/measurement está correto
-
-### Dashboard não carrega
-- Grafana 9+ necessário
-- Datasource InfluxDB configurado corretamente
-
-## Recursos Adicionais
-
-- [Grafana Dashboards](https://grafana.com/docs/grafana/latest/dashboards/)
-- [InfluxDB + Telegraf](https://www.influxdata.com/integration/microsoft-sql-server/)
-- [sql_exporter](https://github.com/burningalchemist/sql_exporter)
+Or for multiple instances:
+```yaml
+scrape_configs:
+  - job_name: 'sql-health-monitor'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: sql-exporter
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_port]
+        action: keep
+        regex: "9399"
+```
