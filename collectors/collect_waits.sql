@@ -1,7 +1,7 @@
-﻿/*
+/*
     SQL Health Monitor - Waits Collector
     Collects wait statistics and system bottlenecks.
-    
+
     Schedule: Every 2 minutes
     Compatibility: SQL Server 2016+
 */
@@ -18,8 +18,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Schema columns: CollectedAt, WaitType, WaitingTasksCount, WaitTimeMs,
-    --                 SignalWaitTimeMs, DeltaWaitTimeMs
+    DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+
+    -- System-wide wait statistics
     INSERT INTO [monitor].[WaitStatsHistory]
         (WaitType, WaitingTasksCount, WaitTimeMs, SignalWaitTimeMs, DeltaWaitTimeMs)
     SELECT
@@ -27,14 +28,14 @@ BEGIN
         ws.waiting_tasks_count AS WaitingTasksCount,
         ws.wait_time_ms        AS WaitTimeMs,
         ws.signal_wait_time_ms AS SignalWaitTimeMs,
-        NULL                   AS DeltaWaitTimeMs  -- Delta calculated externally or in reporting layer
+        NULL                   AS DeltaWaitTimeMs
     FROM sys.dm_os_wait_stats ws
     WHERE ws.wait_type NOT IN (
         'BROKER_EVENTHANDLER', 'BROKER_RECEIVE_WAITFOR', 'BROKER_TASK_STOP',
         'BROKER_TO_FLUSH', 'BROKER_TRANSMITTER', 'CHECKPOINT_QUEUE',
         'CHKPT', 'CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'CLR_SEMAPHORE',
         'DBMIRROR_DBM_MUTEX', 'DBMIRROR_EVENTS_QUEUE', 'DBMIRROR_SEND',
-        'DBMIRROR_WORKER_QUEUE', 'DBMIRRORING_CMD', 'DIRTY_PAGE_POLL',
+        'DBMIRROR_WORKER_QUEUE', 'DBMIRRING_CMD', 'DIRTY_PAGE_POLL',
         'DISPATCHER_QUEUE_TASK_CALL', 'EXECSYNC', 'FSAGENT',
         'FT_IFTS_SCHEDULER_IDLE_WAIT', 'FT_IFTSHC_MUTEX', 'LOGMGR_QUEUE',
         'ONDEMAND_TASK_QUEUE', 'PREEMPTIVE_XE_BUFFER_TARGET', 'PREEMPTIVE_XE_DISPATCHER',
@@ -52,7 +53,24 @@ BEGIN
       AND ws.wait_time_ms > 0
       AND ws.waiting_tasks_count > 0;
 
-    -- Note: WaitHistory and WaitDatabaseHistory tables do not exist in the schema;
-    -- the per-database breakdown insert has been removed.
+    -- Per-database wait breakdown (SQL 2016+)
+    -- Correlates waits with specific databases
+    INSERT INTO [monitor].[WaitDatabaseHistory]
+        (DatabaseId, DatabaseName, WaitType, WaitingTasksCount, WaitTimeMs, SignalWaitTimeMs)
+    SELECT
+        s.database_id                       AS DatabaseId,
+        DB_NAME(s.database_id)              AS DatabaseName,
+        r.wait_type                        AS WaitType,
+        COUNT(*)                           AS WaitingTasksCount,
+        SUM(r.wait_time)                   AS WaitTimeMs,
+        SUM(r.cpu_time)                    AS SignalWaitTimeMs
+    FROM sys.dm_exec_requests r
+    INNER JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
+    WHERE r.database_id > 0
+      AND s.is_user_process = 1
+      AND r.wait_type IS NOT NULL
+      AND r.wait_type NOT IN ('WAITFOR', 'RESOURCE_SEMAPHORE_QUERY_COMPILE')
+    GROUP BY s.database_id, r.wait_type
+    HAVING SUM(r.wait_time) > 0;
 END;
 GO

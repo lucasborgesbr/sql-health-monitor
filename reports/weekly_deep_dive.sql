@@ -310,6 +310,81 @@ BEGIN
         GROUP BY WaitType ORDER BY SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) DESC
     ) lw ON tw.WaitType = lw.WaitType;
 
+    -- Index Recommendations (from DMVs)
+    CREATE TABLE #WeeklyIndexRecommendations (
+        DatabaseName     NVARCHAR(128),
+        SchemaName       NVARCHAR(128),
+        TableName        NVARCHAR(128),
+        RecommendationType NVARCHAR(50),
+        ImpactScore      DECIMAL(18,2),
+        EqualityColumns  NVARCHAR(MAX),
+        InequalityColumns NVARCHAR(MAX),
+        IncludeColumns   NVARCHAR(MAX),
+        UserSeeks        BIGINT,
+        RecommendedAction NVARCHAR(MAX)
+    );
+    INSERT #WeeklyIndexRecommendations
+    SELECT TOP 10
+        DatabaseName, SchemaName, TableName,
+        RecommendationType, ImpactScore,
+        EqualityColumns, InequalityColumns, IncludeColumns,
+        UserSeeks, RecommendedAction
+    FROM [monitor].[IndexRecommendations]
+    WHERE CollectedAt >= DATEADD(DAY,-1,@Now)
+      AND RecommendationType = 'MISSING_INDEX'
+    ORDER BY ImpactScore DESC;
+
+    -- Query Store Top Queries (multi-dimension)
+    CREATE TABLE #WeeklyTopQueriesQS (
+        DatabaseName     NVARCHAR(128),
+        QueryId          INT,
+        TotalCpuMs       DECIMAL(18,2),
+        AvgCpuMs         DECIMAL(18,2),
+        TotalDurationMs   DECIMAL(18,2),
+        AvgDurationMs    DECIMAL(18,2),
+        TotalLogicalReads BIGINT,
+        AvgLogicalReads  DECIMAL(18,2),
+        TotalWrites      BIGINT,
+        ExecutionCount   BIGINT,
+        QueryText        NVARCHAR(4000),
+        QueryDimension   NVARCHAR(20)
+    );
+    INSERT #WeeklyTopQueriesQS
+    -- Top by CPU
+    SELECT DatabaseName, QueryId,
+        SUM(TotalCpuMs), MAX(AvgCpuMs), SUM(TotalDurationMs), MAX(AvgDurationMs),
+        SUM(TotalLogicalReads), MAX(AvgLogicalReads), SUM(TotalLogicalWrites),
+        SUM(ExecutionCount), MAX(QueryText), 'CPU'
+    FROM [monitor].[QueryStoreHistory]
+    WHERE CollectedAt >= @ThisWeekStart
+    GROUP BY DatabaseName, QueryId
+    HAVING SUM(TotalCpuMs) > 0
+    ORDER BY SUM(TotalCpuMs) DESC;
+
+    -- Top by Duration
+    INSERT #WeeklyTopQueriesQS
+    SELECT DatabaseName, QueryId,
+        SUM(TotalCpuMs), MAX(AvgCpuMs), SUM(TotalDurationMs), MAX(AvgDurationMs),
+        SUM(TotalLogicalReads), MAX(AvgLogicalReads), SUM(TotalLogicalWrites),
+        SUM(ExecutionCount), MAX(QueryText), 'DURATION'
+    FROM [monitor].[QueryStoreHistory]
+    WHERE CollectedAt >= @ThisWeekStart
+    GROUP BY DatabaseName, QueryId
+    HAVING SUM(TotalDurationMs) > 0
+    ORDER BY SUM(TotalDurationMs) DESC;
+
+    -- Top by Reads
+    INSERT #WeeklyTopQueriesQS
+    SELECT DatabaseName, QueryId,
+        SUM(TotalCpuMs), MAX(AvgCpuMs), SUM(TotalDurationMs), MAX(AvgDurationMs),
+        SUM(TotalLogicalReads), MAX(AvgLogicalReads), SUM(TotalLogicalWrites),
+        SUM(ExecutionCount), MAX(QueryText), 'READS'
+    FROM [monitor].[QueryStoreHistory]
+    WHERE CollectedAt >= @ThisWeekStart
+    GROUP BY DatabaseName, QueryId
+    HAVING SUM(TotalLogicalReads) > 0
+    ORDER BY SUM(TotalLogicalReads) DESC;
+
     -- ============================================================
     -- BUILD HTML
     -- ============================================================

@@ -307,6 +307,114 @@ BEGIN
         SET @HtmlBody += '</table>';
     END;
 
+    -- ---- Index Recommendations (from #WeeklyIndexRecommendations) ----
+    IF OBJECT_ID('tempdb..#WeeklyIndexRecommendations') IS NOT NULL AND EXISTS (SELECT 1 FROM #WeeklyIndexRecommendations)
+    BEGIN
+        SET @HtmlBody += '<h2>Index Recommendations</h2>'
+            + '<p style="color:#888;font-size:11px">Based on SQL Server missing index DMVs. Impact score = estimated improvement %.</p>'
+            + '<table><tr><th>Database</th><th>Table</th><th>Type</th><th>Impact</th><th>Seeking Columns</th><th>Action</th></tr>';
+
+        DECLARE @irDb NVARCHAR(128), @irSchema NVARCHAR(128), @irTable NVARCHAR(128),
+                @irType NVARCHAR(50), @irImpact DECIMAL(18,2), @irEq NVARCHAR(MAX),
+                @irIneq NVARCHAR(MAX), @irInc NVARCHAR(MAX), @irSeeks BIGINT, @irAction NVARCHAR(MAX);
+        DECLARE cur_idx CURSOR LOCAL FAST_FORWARD FOR
+            SELECT DatabaseName, SchemaName, TableName, RecommendationType, ImpactScore,
+                   EqualityColumns, InequalityColumns, IncludeColumns, UserSeeks, RecommendedAction
+            FROM #WeeklyIndexRecommendations ORDER BY ImpactScore DESC;
+        OPEN cur_idx;
+        FETCH NEXT FROM cur_idx INTO @irDb, @irSchema, @irTable, @irType, @irImpact, @irEq, @irIneq, @irInc, @irSeeks, @irAction;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @HtmlBody += '<tr>'
+                + '<td>' + ISNULL(@irDb,'') + '</td>'
+                + '<td>' + ISNULL(@irSchema,'') + '.' + ISNULL(@irTable,'') + '</td>'
+                + '<td><span class="badge warn">' + ISNULL(@irType,'') + '</span></td>'
+                + '<td><strong>' + CAST(CAST(@irImpact AS INT) AS VARCHAR) + '%</strong></td>'
+                + '<td style="font-size:11px;font-family:monospace">' + ISNULL(@irEq,'') + CASE WHEN @irIneq IS NOT NULL THEN ', ' + @irIneq ELSE '' END + '</td>'
+                + '<td><pre style="margin:0;font-size:10px;white-space:pre-wrap">' + REPLACE(REPLACE(LEFT(ISNULL(@irAction,''),200),'<','&lt;'),'>','&gt;') + '</pre></td>'
+                + '</tr>';
+            FETCH NEXT FROM cur_idx INTO @irDb, @irSchema, @irTable, @irType, @irImpact, @irEq, @irIneq, @irInc, @irSeeks, @irAction;
+        END;
+        CLOSE cur_idx; DEALLOCATE cur_idx;
+        SET @HtmlBody += '</table>';
+    END;
+
+    -- ---- Top Queries by Multiple Dimensions (from #WeeklyTopQueriesQS) ----
+    IF OBJECT_ID('tempdb..#WeeklyTopQueriesQS') IS NOT NULL AND EXISTS (SELECT 1 FROM #WeeklyTopQueriesQS)
+    BEGIN
+        -- CPU dimension
+        SET @HtmlBody += '<h2>Top Queries by CPU</h2>'
+            + '<table><tr><th>Database</th><th>Query</th><th>Total CPU (ms)</th><th>Avg CPU (ms)</th><th>Executions</th></tr>';
+
+        DECLARE @qsDb NVARCHAR(128), @qsId INT, @qsCpu DECIMAL(18,2), @qsAvgCpu DECIMAL(18,2),
+                @qsDur DECIMAL(18,2), @qsAvgDur DECIMAL(18,2), @qsReads BIGINT, @qsAvgReads DECIMAL(18,2),
+                @qsWrites BIGINT, @qsExec BIGINT, @qsText NVARCHAR(4000), @qsDim NVARCHAR(20);
+        DECLARE cur_qs CURSOR LOCAL FAST_FORWARD FOR
+            SELECT TOP 10 DatabaseName, QueryId, TotalCpuMs, AvgCpuMs, TotalDurationMs, AvgDurationMs,
+                   TotalLogicalReads, AvgLogicalReads, TotalWrites, ExecutionCount, QueryText, QueryDimension
+            FROM #WeeklyTopQueriesQS WHERE QueryDimension = 'CPU'
+            ORDER BY TotalCpuMs DESC;
+        OPEN cur_qs;
+        FETCH NEXT FROM cur_qs INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @HtmlBody += '<tr><td>' + ISNULL(@qsDb,'')
+                + '</td><td style="font-size:10px;font-family:monospace;max-width:400px;overflow:hidden;text-overflow:ellipsis">' + REPLACE(REPLACE(LEFT(ISNULL(@qsText,''),100),'<','&lt;'),'>','&gt;')
+                + '</td><td>' + CAST(CAST(@qsCpu AS BIGINT) AS VARCHAR)
+                + '</td><td>' + CAST(CAST(@qsAvgCpu AS BIGINT) AS VARCHAR)
+                + '</td><td>' + CAST(@qsExec AS VARCHAR) + '</td></tr>';
+            FETCH NEXT FROM cur_qs INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        END;
+        CLOSE cur_qs; DEALLOCATE cur_qs;
+        SET @HtmlBody += '</table>';
+
+        -- Duration dimension
+        SET @HtmlBody += '<h2>Top Queries by Duration</h2>'
+            + '<table><tr><th>Database</th><th>Query</th><th>Total Duration (ms)</th><th>Avg Duration (ms)</th><th>Executions</th></tr>';
+
+        DECLARE cur_qs2 CURSOR LOCAL FAST_FORWARD FOR
+            SELECT TOP 10 DatabaseName, QueryId, TotalCpuMs, AvgCpuMs, TotalDurationMs, AvgDurationMs,
+                   TotalLogicalReads, AvgLogicalReads, TotalWrites, ExecutionCount, QueryText, QueryDimension
+            FROM #WeeklyTopQueriesQS WHERE QueryDimension = 'DURATION'
+            ORDER BY TotalDurationMs DESC;
+        OPEN cur_qs2;
+        FETCH NEXT FROM cur_qs2 INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @HtmlBody += '<tr><td>' + ISNULL(@qsDb,'')
+                + '</td><td style="font-size:10px;font-family:monospace;max-width:400px;overflow:hidden;text-overflow:ellipsis">' + REPLACE(REPLACE(LEFT(ISNULL(@qsText,''),100),'<','&lt;'),'>','&gt;')
+                + '</td><td>' + CAST(CAST(@qsDur AS BIGINT) AS VARCHAR)
+                + '</td><td>' + CAST(CAST(@qsAvgDur AS BIGINT) AS VARCHAR)
+                + '</td><td>' + CAST(@qsExec AS VARCHAR) + '</td></tr>';
+            FETCH NEXT FROM cur_qs2 INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        END;
+        CLOSE cur_qs2; DEALLOCATE cur_qs2;
+        SET @HtmlBody += '</table>';
+
+        -- Reads dimension
+        SET @HtmlBody += '<h2>Top Queries by I/O (Reads)</h2>'
+            + '<table><tr><th>Database</th><th>Query</th><th>Total Reads</th><th>Avg Reads</th><th>Executions</th></tr>';
+
+        DECLARE cur_qs3 CURSOR LOCAL FAST_FORWARD FOR
+            SELECT TOP 10 DatabaseName, QueryId, TotalCpuMs, AvgCpuMs, TotalDurationMs, AvgDurationMs,
+                   TotalLogicalReads, AvgLogicalReads, TotalWrites, ExecutionCount, QueryText, QueryDimension
+            FROM #WeeklyTopQueriesQS WHERE QueryDimension = 'READS'
+            ORDER BY TotalLogicalReads DESC;
+        OPEN cur_qs3;
+        FETCH NEXT FROM cur_qs3 INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            SET @HtmlBody += '<tr><td>' + ISNULL(@qsDb,'')
+                + '</td><td style="font-size:10px;font-family:monospace;max-width:400px;overflow:hidden;text-overflow:ellipsis">' + REPLACE(REPLACE(LEFT(ISNULL(@qsText,''),100),'<','&lt;'),'>','&gt;')
+                + '</td><td>' + CAST(@qsReads AS VARCHAR)
+                + '</td><td>' + CAST(CAST(@qsAvgReads AS BIGINT) AS VARCHAR)
+                + '</td><td>' + CAST(@qsExec AS VARCHAR) + '</td></tr>';
+            FETCH NEXT FROM cur_qs3 INTO @qsDb, @qsId, @qsCpu, @qsAvgCpu, @qsDur, @qsAvgDur, @qsReads, @qsAvgReads, @qsWrites, @qsExec, @qsText, @qsDim;
+        END;
+        CLOSE cur_qs3; DEALLOCATE cur_qs3;
+        SET @HtmlBody += '</table>';
+    END;
+
     -- Footer
     SET @HtmlBody += '</div>'
         + '<div class="ftr">SQL Health Monitor &nbsp;|&nbsp; ' + @ServerName
