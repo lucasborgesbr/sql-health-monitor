@@ -13,7 +13,10 @@ PowerShell is used **only** for deployment (`deploy/Install.ps1` runs the `.sql`
 
 ### Key Features
 
-- **18 Health Collectors**
+- **24+ Health Collectors** including live sessions, Query Store, and index recommendations
+- **Real-Time Visibility** — live session capture with blocking chain detection
+- **Query Store Integration** — multi-dimensional query analysis (CPU, Duration, I/O)
+- **Index Recommendations** — DMV-based suggestions with CREATE INDEX scripts
 - **Alert Engine** — configurable thresholds with cooldown periods and alert history
 - **Statistical Baseline Engine** — anomaly detection using standard deviation
 - **HTML Reports via Database Mail** — daily health check and weekly deep dive; HTML built inside T-SQL procedures, sent via `sp_send_dbmail`
