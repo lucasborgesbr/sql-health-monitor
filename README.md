@@ -23,6 +23,18 @@ PowerShell is used **only** for deployment (`deploy/Install.ps1` runs the `.sql`
 - **Uptime / SLA Tracking** — incident classification, SLA compliance, monthly reports
 - **Multi-Instance Support** — centralized management with drift detection
 - **Multi-Language** — English and Portuguese (BR)
+- **Grafana Dashboards** — Direct MSSQL or Prometheus-based visualization
+
+## Grafana Integration
+
+Two dashboard options are available in [`grafana/`](grafana/):
+
+| Dashboard | Datasource | Best For |
+|-----------|------------|----------|
+| [sql-health-monitor-direct.json](grafana/dashboards/sql-health-monitor-direct.json) | MSSQL | Single instance, simple setup |
+| [sql-health-monitor-prometheus.json](grafana/dashboards/sql-health-monitor-prometheus.json) | Prometheus | Multi-instance, advanced alerting |
+
+See [`grafana/README.md`](grafana/README.md) for setup instructions.
 
 ## Prerequisites
 
@@ -266,6 +278,15 @@ sql-health-monitor/
 │   ├── settings.sql                  # Settings metadata (runtime config lives in [monitor].[Settings])
 │   ├── languages.sql                  # UI strings: en, ptbr
 │   └── default.json                  # Legacy PS-era reference; superseded by Settings table
+│
+├── grafana/                          # Grafana dashboards
+│   ├── dashboards/
+│   │   ├── sql-health-monitor-direct.json      # Direct MSSQL queries
+│   │   └── sql-health-monitor-prometheus.json  # Prometheus metrics
+│   ├── queries/
+│   │   ├── prometheus_queries.sql    # SQL → Prometheus exposition format
+│   │   └── influxdb_queries.sql      # SQL → InfluxDB line protocol
+│   └── README.md                     # Setup guide
 │
 └── validate_installation.sql         # Pre-install validation
     validate_uptime_tracker.sql        # Post-install uptime validation
