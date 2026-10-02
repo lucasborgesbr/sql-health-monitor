@@ -112,10 +112,10 @@ UNION ALL SELECT 'Disk', COUNT(*) FROM [monitor].[DiskHistory];
 
 ```sql
 -- Preview daily report (debug mode = shows HTML, doesn't send email)
-EXEC [monitor].[usp_Report_DailyHealth] @DebugMode = 1;
+EXEC [monitor].[usp_GenerateDailyReport] @DebugMode = 1;
 
 -- Preview weekly report
-EXEC [monitor].[usp_Report_WeeklyDeepDive] @DebugMode = 1;
+EXEC [monitor].[usp_GenerateWeeklyReport] @DebugMode = 1;
 ```
 
 ### 5. Validate Installation

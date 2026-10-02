@@ -17,3 +17,6 @@ Thumbs.db
 *.credential
 *.pfx
 *.key
+
+# Planning & internal docs (do not track)
+docs/OPEN-SOURCE-PLAN.md

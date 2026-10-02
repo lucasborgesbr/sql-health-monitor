@@ -263,7 +263,7 @@ Example cron configuration:
 0 8 * * 1 mssql-cli -S localhost,1433 -U sa -P "your_password" -d SQLHealthMonitor -Q "EXEC [monitor].[usp_RunReport] @ReportType = 'Weekly';" > /var/log/sql_health_monitor_weekly.log 2>&1
 
 # Maintenance job daily at 3:00 AM
-0 3 * * * mssql-cli -S localhost,1433 -U sa -P "your_password" -d SQLHealthMonitor -Q "EXEC [monitor].[usp_Maintenance_PurgeOldData];" > /var/log/sql_health_monitor_maintenance.log 2>&1
+0 3 * * * mssql-cli -S localhost,1433 -U sa -P "your_password" -d SQLHealthMonitor -Q "EXEC [monitor].[usp_PurgeHistoricalData];" > /var/log/sql_health_monitor_maintenance.log 2>&1
 ```
 
 ### Step 2: Systemd Service Management

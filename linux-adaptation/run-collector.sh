@@ -203,7 +203,7 @@ generate_report() {
 # Run maintenance
 run_maintenance() {
     log "Running maintenance tasks..."
-    execute_sql "EXEC [monitor].[usp_Maintenance_PurgeOldData];" "-l 120"
+    execute_sql "EXEC [monitor].[usp_PurgeHistoricalData];" "-l 120"
     execute_sql "EXEC [monitor].[usp_Maintenance_UpdateBaselines];" "-l 120"
     log "Maintenance completed"
 }

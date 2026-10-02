@@ -318,6 +318,12 @@ BEGIN
     EXEC [monitor].[usp_BuildWeeklyHtml]
         @ServerName = @ServerName,
         @WeekStr    = @WeekStr,
+        @CpuAvgThis = @CpuAvgThis,
+        @CpuAvgLast = @CpuAvgLast,
+        @PleAvgThis = @PleAvgThis,
+        @BlockingThis = @BlockingThis,
+        @AlertsThis = @AlertsThis,
+        @ErrorsThis = @ErrorsThis,
         @HtmlBody   = @HtmlBody OUTPUT;
 
     -- ============================================================

@@ -276,7 +276,7 @@ SQL Agent Job
 | SQL Health Monitor - Alert Engine | A cada 5 min | `usp_RunAlertEngine` |
 | SQL Health Monitor - Daily Report | Diário 07:00 | `usp_RunReport @ReportType='Daily'` |
 | SQL Health Monitor - Weekly Report | Segunda 08:00 | `usp_RunReport @ReportType='Weekly'` |
-| SQL Health Monitor - Purge Old Data | Diário 03:00 | `usp_Maintenance_PurgeOldData` |
+| SQL Health Monitor - Purge Old Data | Diário 03:00 | `usp_PurgeHistoricalData` |
 | SQL Health Monitor - Update Baselines | Domingo 02:00 | `usp_Maintenance_UpdateBaselines` |
 
 ## Uso
