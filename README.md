@@ -292,7 +292,7 @@ Six jobs are created by `install/04-create-jobs.sql`:
 | SQL Health Monitor - Alert Engine | Every 5 min | `usp_RunAlertEngine` |
 | SQL Health Monitor - Daily Report | Daily 07:00 | `usp_RunReport @ReportType='Daily'` |
 | SQL Health Monitor - Weekly Report | Monday 08:00 | `usp_RunReport @ReportType='Weekly'` |
-| SQL Health Monitor - Purge Old Data | Daily 03:00 | `usp_Maintenance_PurgeOldData` |
+| SQL Health Monitor - Purge Old Data | Daily 03:00 | `usp_PurgeHistoricalData` |
 | SQL Health Monitor - Update Baselines | Sunday 02:00 | `usp_Maintenance_UpdateBaselines` |
 
 Schedules can be adjusted via SSMS > SQL Server Agent > Jobs.

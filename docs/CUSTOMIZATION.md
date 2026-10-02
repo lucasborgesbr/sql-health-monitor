@@ -186,5 +186,5 @@ EXEC msdb.dbo.sp_update_jobschedule
 
 ```sql
 -- Run purge with larger batches
-EXEC [monitor].[usp_Maintenance_PurgeOldData] @BatchSize = 50000;
+EXEC [monitor].[usp_PurgeHistoricalData] @BatchSize = 50000;
 ```

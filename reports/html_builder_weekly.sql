@@ -57,16 +57,23 @@ USE [SQLHealthMonitor];
 GO
 
 IF OBJECT_ID('[monitor].[usp_BuildWeeklyHtml]', 'P') IS NOT NULL
-    EXEC('ALTER PROCEDURE [monitor].[usp_BuildWeeklyHtml] @ServerName NVARCHAR(128) = NULL, @WeekStr NVARCHAR(50) = NULL, @HtmlBody VARCHAR(MAX) = NULL OUTPUT AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
+    EXEC('ALTER PROCEDURE [monitor].[usp_BuildWeeklyHtml] @ServerName NVARCHAR(128) = NULL, @WeekStr NVARCHAR(50) = NULL, @CpuAvgThis INT = NULL, @CpuAvgLast INT = NULL, @PleAvgThis INT = NULL, @BlockingThis INT = NULL, @AlertsThis INT = NULL, @ErrorsThis INT = NULL, @HtmlBody VARCHAR(MAX) = NULL OUTPUT AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
 GO
 
 IF OBJECT_ID('[monitor].[usp_BuildWeeklyHtml]', 'P') IS NULL
-    EXEC('CREATE PROCEDURE [monitor].[usp_BuildWeeklyHtml] @ServerName NVARCHAR(128) = NULL, @WeekStr NVARCHAR(50) = NULL, @HtmlBody VARCHAR(MAX) = NULL OUTPUT AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
+    EXEC('CREATE PROCEDURE [monitor].[usp_BuildWeeklyHtml] @ServerName NVARCHAR(128) = NULL, @WeekStr NVARCHAR(50) = NULL, @CpuAvgThis INT = NULL, @CpuAvgLast INT = NULL, @PleAvgThis INT = NULL, @BlockingThis INT = NULL, @AlertsThis INT = NULL, @ErrorsThis INT = NULL, @HtmlBody VARCHAR(MAX) = NULL OUTPUT AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
 GO
 
 ALTER PROCEDURE [monitor].[usp_BuildWeeklyHtml]
     @ServerName NVARCHAR(128),
     @WeekStr    NVARCHAR(50),
+    -- Scalar metrics passed directly for guaranteed display
+    @CpuAvgThis INT = NULL,
+    @CpuAvgLast INT = NULL,
+    @PleAvgThis INT = NULL,
+    @BlockingThis INT = NULL,
+    @AlertsThis INT = NULL,
+    @ErrorsThis INT = NULL,
     -- Tabular sections come from caller-created temp tables:
     --   #WeeklyWoW, #WeeklyDiskCapacity, #WeeklyChanges,
     --   #WeeklyTopQueries, #WeeklyRecommendations, #WeeklyTopWaits
@@ -74,6 +81,17 @@ ALTER PROCEDURE [monitor].[usp_BuildWeeklyHtml]
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    -- Default NULL scalars to 0 for safe display
+    SET @CpuAvgThis = ISNULL(@CpuAvgThis, 0);
+    SET @CpuAvgLast = ISNULL(@CpuAvgLast, 0);
+    SET @PleAvgThis = ISNULL(@PleAvgThis, 0);
+    SET @BlockingThis = ISNULL(@BlockingThis, 0);
+    SET @AlertsThis = ISNULL(@AlertsThis, 0);
+    SET @ErrorsThis = ISNULL(@ErrorsThis, 0);
+
+    -- Calculate trend for key metrics
+    DECLARE @CpuTrendPct INT = CASE WHEN @CpuAvgLast > 0 THEN CAST(ROUND((@CpuAvgThis - @CpuAvgLast) * 100.0 / @CpuAvgLast, 0) AS INT) ELSE 0 END;
 
     -- ---- Shared CSS ----
     DECLARE @Css VARCHAR(MAX) =
@@ -107,6 +125,19 @@ BEGIN
         + '<div class="sub">Server: ' + @ServerName + ' &nbsp;|&nbsp; Period: ' + @WeekStr + '</div></div>';
     SET @HtmlBody += '<div class="band">7-day analysis &nbsp;&mdash;&nbsp; Week-over-week comparison &nbsp;&mdash;&nbsp; Capacity projections &nbsp;&mdash;&nbsp; Recommendations</div>';
     SET @HtmlBody += '<div class="body">';
+
+    -- ---- Key Metrics Summary (from scalar params) ----
+    SET @HtmlBody += '<h2>Key Metrics Summary</h2>'
+        + '<table><tr><th>Metric</th><th>Value</th><th>Trend</th></tr>'
+        + '<tr><td>CPU Average (%)</td><td>' + CAST(@CpuAvgThis AS VARCHAR) + '%</td>'
+        + '<td>' + CASE WHEN @CpuTrendPct > 0 THEN '<span class="up">+' + CAST(@CpuTrendPct AS VARCHAR) + '% vs last week</span>'
+                       WHEN @CpuTrendPct < 0 THEN '<span class="dn">' + CAST(@CpuTrendPct AS VARCHAR) + '% vs last week</span>'
+                       ELSE 'stable' END + '</td></tr>'
+        + '<tr><td>Page Life Expectancy (s)</td><td>' + CAST(@PleAvgThis AS VARCHAR) + '</td><td>&mdash;</td></tr>'
+        + '<tr><td>Blocking Events</td><td>' + CAST(@BlockingThis AS VARCHAR) + '</td><td>&mdash;</td></tr>'
+        + '<tr><td>Alerts Fired</td><td>' + CAST(@AlertsThis AS VARCHAR) + '</td><td>&mdash;</td></tr>'
+        + '<tr><td>Critical Errors</td><td>' + CAST(@ErrorsThis AS VARCHAR) + '</td><td>&mdash;</td></tr>'
+        + '</table>';
 
     -- ---- Week-over-Week (from #WeeklyWoW) ----
     IF OBJECT_ID('tempdb..#WeeklyWoW') IS NOT NULL AND EXISTS (SELECT 1 FROM #WeeklyWoW)

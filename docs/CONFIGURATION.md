@@ -119,7 +119,7 @@ UPDATE [monitor].[Settings] SET SettingValue = 'ptbr'
 WHERE Category = 'General' AND SettingName = 'Language';
 
 -- Override language for a single report execution
-EXEC [monitor].[usp_Report_DailyHealth] @OverrideLanguage = 'ptbr';
+EXEC [monitor].[usp_GenerateDailyReport] @OverrideLanguage = 'ptbr';
 ```
 
 ## SQL Agent Job Schedules
