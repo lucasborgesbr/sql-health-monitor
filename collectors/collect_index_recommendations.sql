@@ -20,7 +20,7 @@ IF OBJECT_ID('[monitor].[usp_Collect_IndexRecommendations]', 'P') IS NOT NULL
     EXEC('ALTER PROCEDURE [monitor].[usp_Collect_IndexRecommendations] @DebugMode BIT = 0 AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
 GO
 
-IF OBJECT_ID('[monitor].[usp_Collect_IndexRecommendations]', 'IP') IS NULL
+IF OBJECT_ID('[monitor].[usp_Collect_IndexRecommendations]', 'P') IS NULL
     EXEC('CREATE PROCEDURE [monitor].[usp_Collect_IndexRecommendations] @DebugMode BIT = 0 AS SET NOCOUNT ON; BEGIN DECLARE @D INT = 0; END;');
 GO
 
