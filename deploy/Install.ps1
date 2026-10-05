@@ -96,7 +96,6 @@ $scripts  = @(
     "collectors\collect_live_sessions.sql",
     "collectors\collect_query_store.sql",
     "collectors\collect_index_recommendations.sql",
-    "diagnostics\usp_HealthCheck.sql",
     "reports\html_builder_daily.sql",
     "reports\html_builder_weekly.sql",
     "reports\daily_health_check.sql",
