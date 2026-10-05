@@ -81,7 +81,6 @@ BEGIN
         WHERE d.state_desc = 'ONLINE'
             AND d.name NOT IN ('master', 'model', 'msdb', 'tempdb')
             AND (d.name = @DatabaseName OR @DatabaseName IS NULL)
-            AND (MAX(b.backup_finish_date) IS NULL OR MAX(b.backup_finish_date) < DATEADD(DAY, -2, GETDATE()))
         GROUP BY d.Name
         HAVING MAX(b.backup_finish_date) IS NULL
             OR MAX(b.backup_finish_date) < DATEADD(DAY, -2, GETDATE());
@@ -92,36 +91,25 @@ BEGIN
     -- ============================================================
     IF @CheckId IS NULL OR @CheckId = 2
     BEGIN
+        -- Only data files count toward "space used" -- log files grow for
+        -- different reasons and a nearly full log is a different problem.
         INSERT #HealthCheckResults (Priority, Finding, Details, DatabaseName, Query)
         SELECT TOP 20
             1 AS Priority,
             'Database Space Critical' AS Finding,
-            db_name() + ' data file is ' + CAST(df.UsedPct AS NVARCHAR) + '% full' AS Details,
-            df.DatabaseName,
+            DB_NAME() + ' data file is ' + CAST(UsedPct AS NVARCHAR(5)) + '% full' AS Details,
+            DB_NAME() AS DatabaseName,
             'EXEC sp_spaceused;' AS Query
         FROM (
             SELECT
-                DB_NAME() AS DatabaseName,
-                CAST(SUM(CASE WHEN type_desc = ''LOG'' THEN 0 ELSE 1 END) AS BIT) AS HasDataFile,
-                0 AS UsedPct
+                CAST(SUM(CAST(size AS BIGINT) * 8.0 / 1024) AS DECIMAL(18,2)) AS TotalMB,
+                CAST(SUM(CAST(FILEPROPERTY(name, 'SpaceUsed') AS BIGINT) * 8.0 / 1024) AS DECIMAL(18,2)) AS UsedMB
             FROM sys.database_files
-        ) df
-        CROSS JOIN (
-            SELECT
-                CAST(CAST(SUM(size * 8.0 / 1024) - SUM(CASE WHEN type = 0 THEN 0 ELSE 0 END) AS DECIMAL(18,2)) AS DECIMAL(18,2)) AS UsedMB,
-                CAST(MAX(current_database_size() * 8.0 / 1024) AS DECIMAL(18,2)) AS TotalMB,
-                0 AS UsedPct
-        ) space;
-
-        -- Simpler version using actual space info
-        INSERT #HealthCheckResults (Priority, Finding, Details, DatabaseName, Query)
-        SELECT
-            1 AS Priority,
-            'High Space Usage' AS Finding,
-            'Database may be running low on space' AS Details,
-            @DatabaseName AS DatabaseName,
-            'SELECT * FROM sys.database_files;' AS Query
-        WHERE @DatabaseName IS NOT NULL;
+            WHERE type_desc = 'ROWS'
+        ) s
+        CROSS APPLY (SELECT CASE WHEN s.TotalMB = 0 THEN 0
+                                 ELSE CAST(s.UsedMB * 100.0 / s.TotalMB AS DECIMAL(5,2)) END) u(UsedPct)
+        WHERE u.UsedPct >= 90;
     END;
 
     -- ============================================================
