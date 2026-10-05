@@ -54,8 +54,13 @@ if (-not $sqlcmd) {
 }
 
 # ---- build common sqlcmd args ----
-$authArgs = if ($SqlAuth) { @("-U", $Login, "-P", $Password) } else { @("-E") }
-$baseArgs  = @("-S", $ServerInstance) + $authArgs + @("-b", "-V", "1")
+# With no explicit auth asked for, but SQLCMDUSER set, pass nothing: sqlcmd then
+# reads SQLCMDSERVER / SQLCMDUSER / SQLCMDPASSWORD from the environment itself.
+# Forcing -E here would override them and silently fail on any SQL-auth instance.
+$authArgs = if ($SqlAuth) { @("-U", $Login, "-P", $Password) } elseif ($env:SQLCMDUSER) { @() } else { @("-E") }
+
+# sqlcmd 18+ requires -C (trust server certificate) or it refuses to connect.
+$baseArgs  = @("-S", $ServerInstance) + $authArgs + @("-b", "-V", "1", "-C")
 
 # Scripts to run in order — all paths relative to this file's directory
 $repoRoot = Split-Path $PSScriptRoot -Parent

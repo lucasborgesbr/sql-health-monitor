@@ -49,10 +49,10 @@ Write-Warning "This will permanently delete all SQL Agent Jobs and the SQLHealth
 $confirm = Read-Host "Type YES to continue"
 if ($confirm -ne 'YES') { Write-Host "Cancelled."; exit 0 }
 
-$authArgs = if ($SqlAuth) { @("-U", $Login, "-P", $Password) } else { @("-E") }
+$authArgs = if ($SqlAuth) { @("-U", $Login, "-P", $Password) } elseif ($env:SQLCMDUSER) { @() } else { @("-E") }
 $script   = Join-Path $PSScriptRoot "..\install\Uninstall.sql"
 
-$output = & sqlcmd -S $ServerInstance @authArgs -d master -b -V 1 -i $script 2>&1
+$output = & sqlcmd -S $ServerInstance @authArgs -d master -b -V 1 -C -i $script 2>&1
 $rc     = $LASTEXITCODE
 
 Write-Host ($output | Out-String)
