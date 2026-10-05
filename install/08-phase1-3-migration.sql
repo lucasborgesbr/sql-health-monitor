@@ -39,7 +39,7 @@ BEGIN
         Reads              BIGINT NULL,
         Writes             BIGINT NULL,
         MemoryGrantKB      BIGINT NULL,
-        RowCount           BIGINT NULL,
+        c           BIGINT NULL,
         PercentComplete    INT NULL,
         StartTime          DATETIME2 NULL,
         InputBuffer        NVARCHAR(MAX) NULL,
