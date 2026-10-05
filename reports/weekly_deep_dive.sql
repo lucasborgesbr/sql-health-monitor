@@ -401,6 +401,22 @@ BEGIN
         @ErrorsThis = @ErrorsThis,
         @HtmlBody   = @HtmlBody OUTPUT;
 
+    -- Capture the error immediately: any statement below would reset it.
+    DECLARE @BuildError INT = @@ERROR;
+
+    IF @BuildError <> 0 OR @HtmlBody IS NULL OR LEN(@HtmlBody) = 0
+    BEGIN
+        IF @DebugMode = 1 AND @HtmlBody IS NOT NULL
+            SELECT @HtmlBody AS HtmlBody;
+
+        IF @BuildError <> 0
+            RAISERROR('Weekly report failed: usp_BuildWeeklyHtml returned error %d. Nothing was sent.', 16, 1, @BuildError);
+        ELSE
+            RAISERROR('Weekly report failed: usp_BuildWeeklyHtml produced an empty body. Nothing was sent.', 16, 1);
+
+        RETURN;
+    END;
+
     -- ============================================================
     -- SEND OR DEBUG
     -- ============================================================
