@@ -61,7 +61,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$ServerInstance = "localhost,1433",
+    [string]$ServerInstance = "",
     [string]$Database       = "SQLHealthMonitor",
 
     [switch]$SqlAuth,
@@ -92,14 +92,29 @@ if (-not $sqlcmd) {
     exit 1
 }
 
-$authArgs = if ($SqlAuth) { @("-U", $Login, "-P", $Password) } else { @("-E") }
-$baseArgs = @("-S", $ServerInstance) + $authArgs + @("-b", "-V", "1", "-C")
+$authArgs = if ($SqlAuth) {
+    @("-U", $Login, "-P", $Password)
+} elseif ($env:SQLCMDUSER) {
+    # No explicit auth asked for, but SQLCMDUSER is set -- let sqlcmd read the
+    # SQLCMDSERVER / SQLCMDUSER / SQLCMDPASSWORD environment variables itself.
+    # Passing -E here would force Windows auth and silently override them.
+    @()
+} else {
+    @("-E")
+}
+
+$serverArg = if ($ServerInstance) { @("-S", $ServerInstance) } else { @() }
+if (-not $serverArg -and $env:SQLCMDSERVER) { $serverArg = @() }
+elseif (-not $serverArg) { $serverArg = @("-S", "localhost,1433") }
+
+$baseArgs = $serverArg + $authArgs + @("-b", "-V", "1", "-C")
 
 function Invoke-Sql {
     param([string]$Query, [string]$Db = 'msdb')
-    $out = & $sqlcmd @baseArgs -d $Db -h -1 -W -Q $Query 2>&1
+    # SET NOCOUNT ON, otherwise "(N rows affected)" pollutes the returned lines.
+    $out = & $sqlcmd @baseArgs -d $Db -h -1 -W -Q "SET NOCOUNT ON; $Query" 2>&1
     if ($LASTEXITCODE -ne 0) { throw "sqlcmd failed on '$Db':`n$($out | Out-String)" }
-    return @($out | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' })
+    return @($out | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' -and $_ -notmatch '^\(\d+ rows? affected\)$' })
 }
 
 function Quote-Sql { param([string]$V) return "'" + $V.Replace("'", "''") + "'" }
@@ -111,7 +126,7 @@ function Get-ExistingProfiles {
 
 Write-Host ""
 Write-Host "SQL Health Monitor - Configure Mail" -ForegroundColor Cyan
-Write-Host "  Server    : $ServerInstance"
+Write-Host "  Server    : $(if ($ServerInstance) { $ServerInstance } elseif ($env:SQLCMDSERVER) { "$env:SQLCMDSERVER (from SQLCMDSERVER)" } else { 'localhost,1433' })"
 Write-Host "  Database  : $Database"
 Write-Host ""
 
