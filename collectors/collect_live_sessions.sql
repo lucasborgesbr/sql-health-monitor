@@ -54,7 +54,7 @@ BEGIN
         Reads              BIGINT,
         Writes             BIGINT,
         MemoryGrantKB      BIGINT,
-        RowCount           BIGINT,
+        [RowCount]           BIGINT,
         PercentComplete    INT,
         StartTime          DATETIME2,
         LoginTime          DATETIME2,
@@ -68,7 +68,7 @@ BEGIN
         DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime
+        MemoryGrantKB, [RowCount], PercentComplete, StartTime, LoginTime
     )
     SELECT
         s.session_id                         AS SessionId,
@@ -90,7 +90,7 @@ BEGIN
         r.reads                              AS Reads,
         r.writes                             AS Writes,
         r.memory_grant_kb                    AS MemoryGrantKB,
-        r.row_count                          AS RowCount,
+        r.row_count                          AS [RowCount],
         r.percent_complete                   AS PercentComplete,
         r.start_time                         AS StartTime,
         s.login_time                         AS LoginTime
@@ -106,7 +106,7 @@ BEGIN
         DatabaseName, CommandType, QueryText,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime
+        MemoryGrantKB, [RowCount], PercentComplete, StartTime, LoginTime
     )
     SELECT
         s.session_id                         AS SessionId,
@@ -127,7 +127,7 @@ BEGIN
         0                                    AS Reads,
         0                                    AS Writes,
         0                                    AS MemoryGrantKB,
-        0                                    AS RowCount,
+        0                                    AS [RowCount],
         0                                    AS PercentComplete,
         NULL                                 AS StartTime,
         s.login_time                         AS LoginTime
@@ -165,7 +165,7 @@ BEGIN
         ProgramName, DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime,
+        MemoryGrantKB, [RowCount], PercentComplete, StartTime, LoginTime,
         InputBuffer, QueryPlan
     )
     SELECT
@@ -173,7 +173,7 @@ BEGIN
         ProgramName, DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime,
+        MemoryGrantKB, [RowCount], PercentComplete, StartTime, LoginTime,
         InputBuffer, QueryPlan
     FROM #LiveSessions;
 
