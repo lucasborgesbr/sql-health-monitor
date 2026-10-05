@@ -122,7 +122,7 @@ BEGIN
 
     -- Header
     SET @HtmlBody += '<div class="hdr"><h1>SQL Health Monitor &mdash; Weekly Deep Dive</h1>'
-        + '<div class="sub">Server: ' + @ServerName + ' &nbsp;|&nbsp; Period: ' + @WeekStr + '</div></div>';
+        + '<div class="sub">Server: ' + ISNULL(@ServerName,'') + ' &nbsp;|&nbsp; Period: ' + ISNULL(@WeekStr,'') + '</div></div>';
     SET @HtmlBody += '<div class="band">7-day analysis &nbsp;&mdash;&nbsp; Week-over-week comparison &nbsp;&mdash;&nbsp; Capacity projections &nbsp;&mdash;&nbsp; Recommendations</div>';
     SET @HtmlBody += '<div class="body">';
 
@@ -155,7 +155,7 @@ BEGIN
         FETCH NEXT FROM cur_wow INTO @wMetric, @wThis, @wLast, @wChg;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            SET @HtmlBody += '<tr><td>' + @wMetric + '</td>'
+            SET @HtmlBody += '<tr><td>' + ISNULL(@wMetric,'') + '</td>'
                 + '<td>' + CAST(@wThis AS VARCHAR) + '</td>'
                 + '<td>' + CAST(@wLast AS VARCHAR) + '</td>'
                 + '<td>' + CASE WHEN @wChg IS NULL THEN '&mdash;'
@@ -184,7 +184,7 @@ BEGIN
         FETCH NEXT FROM cur_disk INTO @dDrive, @dTotalGB, @dUsedGB, @dFreeGB, @dUsedPct, @dGrowthGB, @dDays, @dStat;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            SET @HtmlBody += '<tr><td>' + @dDrive
+            SET @HtmlBody += '<tr><td>' + ISNULL(@dDrive,'')
                 + '</td><td>' + CAST(@dTotalGB AS VARCHAR) + ' GB'
                 + '</td><td>' + CAST(@dUsedGB  AS VARCHAR) + ' GB'
                 + '</td><td>' + CAST(@dFreeGB  AS VARCHAR) + ' GB'
@@ -192,7 +192,7 @@ BEGIN
                 + '</td><td>' + CAST(@dGrowthGB AS VARCHAR) + ' GB'
                 + '</td><td>' + CASE WHEN @dDays >= 9999 THEN '&mdash;' ELSE CAST(@dDays AS VARCHAR) END
                 + '</td><td><span class="badge ' + CASE @dStat WHEN 'critical' THEN 'crit' WHEN 'warning' THEN 'warn' ELSE 'ok' END + '">'
-                + UPPER(@dStat) + '</span></td></tr>';
+                + ISNULL(UPPER(@dStat),'') + '</span></td></tr>';
             FETCH NEXT FROM cur_disk INTO @dDrive, @dTotalGB, @dUsedGB, @dFreeGB, @dUsedPct, @dGrowthGB, @dDays, @dStat;
         END;
         CLOSE cur_disk; DEALLOCATE cur_disk;
@@ -213,11 +213,11 @@ BEGIN
         FETCH NEXT FROM cur_chg INTO @chType, @chDate, @chDesc, @chImp;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            SET @HtmlBody += '<tr><td>' + @chType
-                + '</td><td>' + FORMAT(@chDate,'MMM dd HH:mm')
-                + '</td><td>' + @chDesc
+            SET @HtmlBody += '<tr><td>' + ISNULL(@chType,'')
+                + '</td><td>' + ISNULL(FORMAT(@chDate,'MMM dd HH:mm'),'')
+                + '</td><td>' + ISNULL(@chDesc,'')
                 + '</td><td><span class="badge ' + CASE @chImp WHEN 'HIGH' THEN 'crit' WHEN 'MEDIUM' THEN 'warn' ELSE 'ok' END + '">'
-                + @chImp + '</span></td></tr>';
+                + ISNULL(@chImp,'') + '</span></td></tr>';
             FETCH NEXT FROM cur_chg INTO @chType, @chDate, @chDesc, @chImp;
         END;
         CLOSE cur_chg; DEALLOCATE cur_chg;
@@ -239,7 +239,7 @@ BEGIN
         FETCH NEXT FROM cur_qry INTO @qDb, @qThis, @qLast, @qChg, @qExec, @qText;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            SET @HtmlBody += '<tr><td>' + @qDb
+            SET @HtmlBody += '<tr><td>' + ISNULL(@qDb,'(unknown)')
                 + '</td><td>' + CAST(@qThis AS VARCHAR)
                 + '</td><td>' + CAST(@qLast AS VARCHAR)
                 + '</td><td>' + CASE WHEN @qChg IS NULL THEN '<span class="warn">new</span>'
@@ -269,9 +269,9 @@ BEGIN
         BEGIN
             SET @HtmlBody += '<tr>'
                 + '<td><span class="badge p' + CAST(@rPri AS VARCHAR) + '">P' + CAST(@rPri AS VARCHAR) + '</span></td>'
-                + '<td>' + @rCat + '</td>'
-                + '<td>' + @rMsg + '</td>'
-                + '<td>' + @rAct + '</td></tr>';
+                + '<td>' + ISNULL(@rCat,'') + '</td>'
+                + '<td>' + ISNULL(@rMsg,'') + '</td>'
+                + '<td>' + ISNULL(@rAct,'') + '</td></tr>';
             FETCH NEXT FROM cur_rec INTO @rPri, @rCat, @rMsg, @rAct;
         END;
         CLOSE cur_rec; DEALLOCATE cur_rec;
@@ -294,7 +294,7 @@ BEGIN
         FETCH NEXT FROM cur_wt2 INTO @wtType, @wtThis, @wtLast, @wtChg;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            SET @HtmlBody += '<tr><td>' + @wtType
+            SET @HtmlBody += '<tr><td>' + ISNULL(@wtType,'')
                 + '</td><td>' + CAST(@wtThis AS VARCHAR)
                 + '</td><td>' + CAST(@wtLast AS VARCHAR)
                 + '</td><td>' + CASE WHEN @wtChg IS NULL THEN 'new'
