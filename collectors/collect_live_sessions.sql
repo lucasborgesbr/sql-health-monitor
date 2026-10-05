@@ -103,7 +103,7 @@ BEGIN
     -- Also capture sleeping sessions that are blocking
     INSERT INTO #LiveSessions (
         SessionId, SessionStatus, LoginName, HostName, ProgramName,
-        DatabaseName, CommandType, QueryText,
+        DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
         MemoryGrantKB, [RowCount], PercentComplete, StartTime, LoginTime
