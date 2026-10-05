@@ -70,6 +70,7 @@ $scripts  = @(
     "install\07-baselines.sql",
     "install\08-extended-schema.sql",
     "install\09-uptime-tracker.sql",
+    "install\10-phase1-3-schema.sql",
     "collectors\collect_cpu.sql",
     "collectors\collect_memory.sql",
     "collectors\collect_disk.sql",
@@ -87,6 +88,10 @@ $scripts  = @(
     "collectors\collect_database_growth.sql",
     "collectors\collect_errorlog.sql",
     "collectors\collect_uptime_tracker.sql",
+    "collectors\collect_live_sessions.sql",
+    "collectors\collect_query_store.sql",
+    "collectors\collect_index_recommendations.sql",
+    "diagnostics\usp_HealthCheck.sql",
     "reports\html_builder_daily.sql",
     "reports\html_builder_weekly.sql",
     "reports\daily_health_check.sql",
@@ -111,7 +116,6 @@ Write-Host ""
 
 $total   = $scripts.Count
 $current = 0
-$errors  = 0
 
 # sqlcmd resolves :r paths relative to CWD — must run from repo root
 Push-Location $repoRoot
@@ -136,7 +140,15 @@ foreach ($rel in $scripts) {
     if ($rc -ne 0) {
         Write-Host " FAILED" -ForegroundColor Red
         Write-Host ($output | Out-String) -ForegroundColor Red
-        $errors++
+
+        # Stop here. Continuing past a failure installs a partial system that
+        # reports completion -- the next script depends on what this one did.
+        Pop-Location
+        Write-Host ""
+        Write-Host "Deployment stopped at script $current of ${total}: $rel" -ForegroundColor Red
+        Write-Host "Scripts after this one were NOT run, so anything they create is missing." -ForegroundColor Red
+        Write-Host "Fix the cause above and re-run; the scripts are idempotent." -ForegroundColor Red
+        exit 1
     } else {
         Write-Host " OK" -ForegroundColor Green
     }
@@ -145,15 +157,10 @@ foreach ($rel in $scripts) {
 Write-Host ""
 Pop-Location
 
-if ($errors -eq 0) {
-    Write-Host "Deployment complete. $total scripts executed, 0 errors." -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "  1. Configure Database Mail in SQL Server (if not already done)"
-    Write-Host "  2. Update Email.ProfileName and Email.Recipients in [SQLHealthMonitor].[monitor].[Settings]"
-    Write-Host "  3. SQL Agent Jobs are already scheduled. Verify in SSMS > SQL Server Agent > Jobs."
-    Write-Host "  4. Test: EXEC [SQLHealthMonitor].[monitor].[usp_RunReport] @ReportType='Daily', @DebugMode=1"
-} else {
-    Write-Host "Deployment finished with $errors error(s). Review output above." -ForegroundColor Red
-    exit 1
-}
+Write-Host "Deployment complete. $total scripts executed, 0 errors." -ForegroundColor Green
+Write-Host ""
+Write-Host "Next steps:" -ForegroundColor Yellow
+Write-Host "  1. Configure Database Mail in SQL Server (if not already done)"
+Write-Host "  2. Update Email.ProfileName and Email.Recipients in [SQLHealthMonitor].[monitor].[Settings]"
+Write-Host "  3. SQL Agent Jobs are already scheduled. Verify in SSMS > SQL Server Agent > Jobs."
+Write-Host "  4. Test: EXEC [SQLHealthMonitor].[monitor].[usp_RunReport] @ReportType='Daily', @DebugMode=1"

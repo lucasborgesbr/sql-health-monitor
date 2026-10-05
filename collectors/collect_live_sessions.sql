@@ -165,7 +165,7 @@ BEGIN
         ProgramName, DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime,
+        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime,
         InputBuffer, QueryPlan
     )
     SELECT
@@ -173,7 +173,7 @@ BEGIN
         ProgramName, DatabaseName, CommandType, QueryText, QueryHash,
         WaitType, WaitTimeMs, BlockedBy, BlockingCount,
         CpuTimeMs, TotalElapsedTimeMs, Reads, Writes,
-        MemoryGrantKB, RowCount, PercentComplete, StartTime,
+        MemoryGrantKB, RowCount, PercentComplete, StartTime, LoginTime,
         InputBuffer, QueryPlan
     FROM #LiveSessions;
 
