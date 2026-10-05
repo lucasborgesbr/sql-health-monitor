@@ -89,7 +89,7 @@ BEGIN
         r.total_elapsed_time                 AS TotalElapsedTimeMs,
         r.reads                              AS Reads,
         r.writes                             AS Writes,
-        r.memory_grant_kb                    AS MemoryGrantKB,
+        ISNULL(mg.granted_memory_kb, 0)     AS MemoryGrantKB,
         r.row_count                          AS [RowCount],
         r.percent_complete                   AS PercentComplete,
         r.start_time                         AS StartTime,
@@ -97,6 +97,14 @@ BEGIN
     FROM sys.dm_exec_sessions s
     INNER JOIN sys.dm_exec_requests r ON s.session_id = r.session_id
     CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+    -- Memory grants live in their own DMV; sys.dm_exec_requests has no
+    -- memory_grant_kb column on SQL Server 2016+.
+    OUTER APPLY (
+        SELECT SUM(g.granted_memory_kb) AS granted_memory_kb
+        FROM sys.dm_exec_query_memory_grants g
+        WHERE g.session_id = r.session_id
+          AND (g.request_id = r.request_id OR g.request_id = 0)
+    ) mg
     WHERE s.session_id > 50  -- Exclude system sessions
       AND s.is_user_process = 1;
 
