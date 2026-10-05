@@ -243,6 +243,45 @@ SELECT ISNULL([$Database].[monitor].[fn_GetInstalledVersion](), 'NOT_SET');
         Assert-Equal -Expected 'NOT_SET' -Actual $v[0] -Message 'fn_GetInstalledVersion is NULL before any install'
     }
 
+    Invoke-Scenario '99-record-version is idempotent and refreshes LastVerifiedAt' {
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+
+        Invoke-Sql -Db $Database -File 'install\99-record-version.sql' `
+                   -Vars @('Version=1.1.0', 'Mode=Fresh', 'Commit=abc1234') | Out-Null
+
+        $v = Invoke-Sql -Db $Database -Query "SELECT [$Database].[monitor].[fn_GetInstalledVersion]();"
+        Assert-Equal -Expected '1.1.0' -Actual $v[0] -Message 'version recorded'
+
+        $n = Invoke-Sql -Db $Database -Query "SELECT CAST(COUNT(*) AS VARCHAR(10)) FROM [$Database].[monitor].[SchemaVersion];"
+        Assert-Equal -Expected '1' -Actual $n[0] -Message 'exactly one row after first record'
+
+        $c = Invoke-Sql -Db $Database -Query "SELECT CommitHash FROM [$Database].[monitor].[SchemaVersion] WHERE Version = '1.1.0';"
+        Assert-Equal -Expected 'abc1234' -Actual $c[0] -Message 'CommitHash stored'
+
+        # Re-running the same version must not add a row, but must refresh
+        # LastVerifiedAt -- that is how Status answers "did my upgrade apply?".
+        Invoke-Sql -Db $Database -Query "UPDATE [$Database].[monitor].[SchemaVersion] SET LastVerifiedAt = NULL;" | Out-Null
+        Invoke-Sql -Db $Database -File 'install\99-record-version.sql' `
+                   -Vars @('Version=1.1.0', 'Mode=Upgrade', 'Commit=abc1234') | Out-Null
+
+        $n2 = Invoke-Sql -Db $Database -Query "SELECT CAST(COUNT(*) AS VARCHAR(10)) FROM [$Database].[monitor].[SchemaVersion];"
+        Assert-Equal -Expected '1' -Actual $n2[0] -Message 're-running the same version adds no row'
+
+        $lv = Invoke-Sql -Db $Database -Query @"
+SELECT CASE WHEN LastVerifiedAt IS NULL THEN 'NULL' ELSE 'SET' END
+FROM [$Database].[monitor].[SchemaVersion] WHERE Version = '1.1.0';
+"@
+        Assert-Equal -Expected 'SET' -Actual $lv[0] -Message 'LastVerifiedAt refreshed on re-run'
+    }
+
+    Invoke-Scenario 'Recording a new version carries PreviousVersion' {
+        Invoke-Sql -Db $Database -File 'install\99-record-version.sql' `
+                   -Vars @('Version=1.2.0', 'Mode=Upgrade', 'Commit=deadbee') | Out-Null
+
+        $p = Invoke-Sql -Db $Database -Query "SELECT PreviousVersion FROM [$Database].[monitor].[SchemaVersion] WHERE Version = '1.2.0';"
+        Assert-Equal -Expected '1.1.0' -Actual $p[0] -Message 'PreviousVersion records where the upgrade came from'
+    }
+
     # Scenarios for -Mode, upgrades, migrations and job schedules are added by
     # the tasks that implement them. A scenario that cannot pass yet is worse
     # than no scenario: it trains you to ignore red.
