@@ -26,6 +26,63 @@ IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'monitor')
 GO
 
 ----------------------------------------------------------------------
+-- VERSION TRACKING
+--
+-- Answers "what is actually installed on this server", which nothing else in
+-- the repository can. Written by install\99-record-version.sql at the end of
+-- the chain; read by deploy\Install.ps1 -Mode Status before doing anything.
+----------------------------------------------------------------------
+
+IF OBJECT_ID('monitor.SchemaVersion', 'U') IS NULL
+CREATE TABLE [monitor].[SchemaVersion] (
+    Id               INT IDENTITY(1,1) PRIMARY KEY,
+    Version          VARCHAR(20)   NOT NULL,
+    PreviousVersion  VARCHAR(20)   NULL,
+    InstallMode      VARCHAR(10)   NOT NULL,   -- 'Fresh' | 'Upgrade'
+    InstalledAt      DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    InstalledBy      NVARCHAR(128) NOT NULL DEFAULT SUSER_SNAME(),
+    CommitHash       VARCHAR(40)   NULL,       -- git rev-parse --short HEAD, when available
+    LastVerifiedAt   DATETIME2     NULL,       -- last run that reached the end of the chain
+    INDEX IX_SchemaVersion_Id (Id DESC)
+);
+GO
+
+-- Escape hatch for changes that cannot be written idempotently. See
+-- install\migrations\README.md.
+IF OBJECT_ID('monitor.AppliedMigrations', 'U') IS NULL
+CREATE TABLE [monitor].[AppliedMigrations] (
+    FileName     NVARCHAR(255) NOT NULL PRIMARY KEY,
+    Version      VARCHAR(20)   NOT NULL,
+    AppliedAt    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+    AppliedBy    NVARCHAR(128) NOT NULL DEFAULT SUSER_SNAME()
+);
+GO
+
+-- Returns the most recently applied version, or NULL if nothing is recorded
+-- yet -- which is the normal state for an installation that predates version
+-- tracking. Follows the repository's placeholder+ALTER pattern.
+IF OBJECT_ID('[monitor].[fn_GetInstalledVersion]', 'FN') IS NOT NULL
+    EXEC('ALTER FUNCTION [monitor].[fn_GetInstalledVersion]() RETURNS VARCHAR(20) AS BEGIN RETURN NULL; END;');
+GO
+
+IF OBJECT_ID('[monitor].[fn_GetInstalledVersion]', 'FN') IS NULL
+    EXEC('CREATE FUNCTION [monitor].[fn_GetInstalledVersion]() RETURNS VARCHAR(20) AS BEGIN RETURN NULL; END;');
+GO
+
+ALTER FUNCTION [monitor].[fn_GetInstalledVersion]()
+RETURNS VARCHAR(20)
+AS
+BEGIN
+    -- Guarded rather than assuming: the function can be called against a
+    -- database whose schema predates the table.
+    IF OBJECT_ID('[monitor].[SchemaVersion]', 'U') IS NULL
+        RETURN NULL;
+
+    RETURN (SELECT TOP 1 [Version] FROM [monitor].[SchemaVersion] ORDER BY [Id] DESC);
+END;
+GO
+
+----------------------------------------------------------------------
 -- CONFIGURATION TABLES
 ----------------------------------------------------------------------
 

@@ -224,6 +224,25 @@ try {
         Assert-Equal -Expected '42' -Actual $r[0] -Message 'Invoke-Sql returns query output'
     }
 
+    Invoke-Scenario '00-create-schema provides the version tracking objects' {
+        Reset-TestDatabase
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+
+        $t = Invoke-Sql -Query @"
+SELECT COUNT(*) FROM $Database.sys.objects
+WHERE name IN ('SchemaVersion','AppliedMigrations','fn_GetInstalledVersion');
+"@
+        Assert-Equal -Expected '3' -Actual $t[0] -Message 'SchemaVersion, AppliedMigrations and fn_GetInstalledVersion all created'
+
+        # ISNULL makes the result unambiguous: sqlcmd renders a bare NULL as
+        # the literal text "NULL", which is indistinguishable from a real
+        # version string of that value.
+        $v = Invoke-Sql -Db $Database -Query @"
+SELECT ISNULL([$Database].[monitor].[fn_GetInstalledVersion](), 'NOT_SET');
+"@
+        Assert-Equal -Expected 'NOT_SET' -Actual $v[0] -Message 'fn_GetInstalledVersion is NULL before any install'
+    }
+
     # Scenarios for -Mode, upgrades, migrations and job schedules are added by
     # the tasks that implement them. A scenario that cannot pass yet is worse
     # than no scenario: it trains you to ignore red.
