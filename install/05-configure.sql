@@ -13,11 +13,10 @@ GO
 -- DEFAULT SETTINGS
 ----------------------------------------------------------------------
 
--- Clear existing (for re-runs)
-DELETE FROM [monitor].[Settings];
-GO
+-- Operator-owned: insert what is missing, never overwrite what exists.
+MERGE [monitor].[Settings] WITH (HOLDLOCK) AS T
+USING (VALUES
 
-INSERT INTO [monitor].[Settings] (Category, SettingName, SettingValue, Description, DataType) VALUES
 -- General
 ('General', 'Language', 'en', 'Report language: en or ptbr', 'string'),
 ('General', 'ServerName', @@SERVERNAME, 'Server identifier for reports', 'string'),
@@ -58,17 +57,21 @@ INSERT INTO [monitor].[Settings] (Category, SettingName, SettingValue, Descripti
 ('Features', 'CollectErrorLog', '1', 'Enable error log collection', 'bool'),
 ('Features', 'CollectLogGrowth', '1', 'Enable log growth tracking', 'bool'),
 ('Features', 'CollectDeadlocks', '1', 'Enable deadlock detection', 'bool'),
-('Features', 'CollectUptimeTracker', '1', 'Enable uptime SLA tracking', 'bool');
+('Features', 'CollectUptimeTracker', '1', 'Enable uptime SLA tracking', 'bool')) AS S (Category, SettingName, SettingValue, Description, DataType)
+    ON T.[Category] = S.Category AND T.[SettingName] = S.SettingName
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (Category, SettingName, SettingValue, Description, DataType) VALUES (S.Category, S.SettingName, S.SettingValue, S.Description, S.DataType);
+
 GO
 
 ----------------------------------------------------------------------
 -- DEFAULT THRESHOLDS
 ----------------------------------------------------------------------
 
-DELETE FROM [monitor].[Thresholds];
-GO
+-- Operator-owned: a threshold the operator tuned is not reset by an upgrade.
+MERGE [monitor].[Thresholds] WITH (HOLDLOCK) AS T
+USING (VALUES
 
-INSERT INTO [monitor].[Thresholds] (MetricName, WarningValue, CriticalValue, Operator, Description) VALUES
 -- CPU
 ('CPU_SqlPct', 80, 95, '>=', 'SQL Server CPU utilization percentage'),
 ('CPU_SystemPct', 90, 98, '>=', 'Total system CPU utilization'),
@@ -107,17 +110,21 @@ INSERT INTO [monitor].[Thresholds] (MetricName, WarningValue, CriticalValue, Ope
 -- Uptime/SLA
 ('SLA_UptimePercentage', 99.5, 99.0, '<', 'Uptime percentage threshold'),
 ('SLA_DowntimeMinutes', 60, 1440, '>=', 'Downtime threshold (minutes)'),
-('SLA_IncidentResponseTime', 60, 240, '>=', 'Incident response time threshold (minutes)');
+('SLA_IncidentResponseTime', 60, 240, '>=', 'Incident response time threshold (minutes)')) AS S (MetricName, WarningValue, CriticalValue, Operator, Description)
+    ON T.[MetricName] = S.MetricName
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (MetricName, WarningValue, CriticalValue, Operator, Description) VALUES (S.MetricName, S.WarningValue, S.CriticalValue, S.Operator, S.Description);
+
 GO
 
 ----------------------------------------------------------------------
 -- LANGUAGE STRINGS (EN)
 ----------------------------------------------------------------------
 
-DELETE FROM [monitor].[Languages];
-GO
+-- Repo-owned: translations track the release, so matched rows are updated.
+MERGE [monitor].[Languages] WITH (HOLDLOCK) AS T
+USING (VALUES
 
-INSERT INTO [monitor].[Languages] (LanguageCode, StringKey, StringValue) VALUES
 -- Report headers
 ('en', 'report.daily.title', 'Daily SQL Health Report'),
 ('en', 'report.daily.subtitle', 'Server: {server} | Date: {date}'),
@@ -189,7 +196,13 @@ INSERT INTO [monitor].[Languages] (LanguageCode, StringKey, StringValue) VALUES
 ('ptbr', 'alert.disk.space', 'Drive {drive} em {value}% usado (limite: {threshold}%)'),
 ('ptbr', 'alert.ag.behind', 'Réplica {replica} está {value}s atrás da primária (limite: {threshold}s)'),
 ('ptbr', 'alert.backup.old', 'Banco {db}: último backup full há {value}h (limite: {threshold}h)'),
-('ptbr', 'alert.blocking', 'Bloqueio detectado: SPID {blocker} bloqueando {blocked} por {value}s');
+('ptbr', 'alert.blocking', 'Bloqueio detectado: SPID {blocker} bloqueando {blocked} por {value}s')) AS S (LanguageCode, StringKey, StringValue)
+    ON T.[LanguageCode] = S.LanguageCode AND T.[StringKey] = S.StringKey
+    WHEN MATCHED AND T.[StringValue] <> S.StringValue THEN
+        UPDATE SET T.[StringValue] = S.StringValue
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (LanguageCode, StringKey, StringValue) VALUES (S.LanguageCode, S.StringKey, S.StringValue);
+
 GO
 
 PRINT '✓ Default configuration loaded.';
