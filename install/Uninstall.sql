@@ -12,6 +12,8 @@
         or via deploy\Uninstall.ps1
 */
 
+:setvar DatabaseName "SQLHealthMonitor"
+
 USE [master];
 GO
 
@@ -51,14 +53,14 @@ CLOSE cur; DEALLOCATE cur;
 -- ============================================================
 -- DROP DATABASE
 -- ============================================================
-IF DB_ID('SQLHealthMonitor') IS NOT NULL
+IF DB_ID('$(DatabaseName)') IS NOT NULL
 BEGIN
-    ALTER DATABASE [SQLHealthMonitor] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE [SQLHealthMonitor];
-    PRINT '  Dropped database: SQLHealthMonitor';
+    ALTER DATABASE [$(DatabaseName)] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [$(DatabaseName)];
+    PRINT '  Dropped database: $(DatabaseName)';
 END
 ELSE
-    PRINT '  Skipped (not found): database SQLHealthMonitor';
+    PRINT '  Skipped (not found): database $(DatabaseName)';
 
 PRINT '';
 PRINT 'Uninstall complete.';

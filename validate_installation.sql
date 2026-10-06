@@ -142,5 +142,34 @@ BEGIN
 END
 PRINT '';
 
+----------------------------------------------------------------------
+-- VERSION TRACKING
+----------------------------------------------------------------------
+
+IF OBJECT_ID('monitor.SchemaVersion', 'U') IS NULL
+BEGIN
+    PRINT '! [monitor].[SchemaVersion] not found -- this install predates version tracking.';
+    PRINT '  Run deploy\Install.ps1 -Mode Upgrade to stamp it.';
+END
+ELSE
+BEGIN
+    DECLARE @Installed VARCHAR(20) = [monitor].[fn_GetInstalledVersion]();
+    IF @Installed IS NULL
+        PRINT '! No version recorded. Run deploy\Install.ps1 -Mode Upgrade to stamp it.';
+    ELSE
+        PRINT 'OK  Installed version ' + @Installed;
+END;
+
+IF OBJECT_ID('monitor.AppliedMigrations', 'U') IS NULL
+    PRINT '! [monitor].[AppliedMigrations] not found -- migrations cannot be tracked.';
+ELSE
+BEGIN
+    -- A subquery is not allowed inside the PRINT concatenation, so take the
+    -- count first.
+    DECLARE @Migrations INT = (SELECT COUNT(*) FROM [monitor].[AppliedMigrations]);
+    PRINT 'OK  Migrations applied: ' + CAST(@Migrations AS VARCHAR(10));
+END;
+PRINT '';
+
 PRINT 'Validation completed at ' + CONVERT(VARCHAR, GETDATE(), 120);
 GO
