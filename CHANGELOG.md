@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-06
+
+### Added
+- `VERSION` file: the single semver source the installer reads
+- `[monitor].[SchemaVersion]` — one row per version applied, with the commit
+  hash and the `LastVerifiedAt` a failed deployment leaves behind
+- `[monitor].[AppliedMigrations]` and `[monitor].[fn_GetInstalledVersion]()`
+- `install/99-record-version.sql`, run last in the chain
+- `install/migrations/` for changes that cannot be written idempotently
+- `Install.ps1 -Mode Status | Upgrade | Fresh`, plus `-Force`, `-ResetSchedules`,
+  `-SkipJobs`, `-AssumeVersion` and `-BackupPath`
+- `tests/Test-Install.ps1` — 30 scenarios against a live instance
+- `tools/gen-column-guards.py` and `tools/rewrite-jobs.py`
+
+### Changed
+- Install scripts reconcile table columns on existing installations, so a new
+  column finally reaches an upgrade instead of being silently skipped
+- `05-configure.sql` inserts defaults without overwriting existing values
+- `04-create-jobs.sql` creates a job only when absent; an existing job gets its
+  step refreshed and its schedule left alone
+- `Uninstall.ps1` takes `-Database` and reports the server, database and
+  installed version before asking for confirmation
+- `validate_installation.sql` reports the recorded version and applied migrations
+
+### Fixed
+- Re-running the installer no longer wipes `Settings`, `Thresholds` or job
+  schedules
+- `Install.ps1` stops at the first failing script and names it, instead of
+  counting errors and reporting completion over a partial install
+- `Install.ps1` and `Uninstall.ps1` honour `SQLCMDUSER` / `SQLCMDPASSWORD`
+  instead of forcing `-E`, and pass `-C`, which sqlcmd 18 requires
+- `04-create-jobs.sql` idempotency guard tested `OBJECT_ID(..., 'IP')` instead
+  of `'P'`, so the collector could be installed once and never reinstalled
+- Phase 1-3 (schema, three collectors, on-demand health check) added to the
+  install chain; it had never been installed
+- `LiveSessionsHistory` declared a column named `c` while the collector inserts
+  `RowCount`; `QueryHash` missing from an INSERT column list; memory grants read
+  from a DMV column that no longer exists on SQL Server 2016+
+- A report that fails now raises instead of sending a blank email
+
+### Notes
+- Values in `Settings` and `Thresholds` are yours: an upgrade inserts new
+  defaults but never overwrites what you set. Changing a default in the repo
+  does not reach existing installations — that needs a migration.
+- Install from a tag, not from `main`. `git clone --branch v1.1.0` gives you
+  exactly that release.
+- `diagnostics/usp_HealthCheck.sql` is not in the install chain. It has never
+  run; verifying it is separate work.
+
 ## [1.0.0] - 2026-06-02
 
 ### Added

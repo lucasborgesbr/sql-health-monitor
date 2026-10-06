@@ -37,14 +37,46 @@ O PowerShell é usado **apenas** para deploy (`deploy/Install.ps1` executa os ar
 ### Opção 1 — Script de deploy (recomendado)
 
 ```powershell
-# Windows auth
+# O que está instalado e o que tem neste checkout? Somente leitura.
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Status
+
+# Instala, ou atualiza sobre uma instalação existente. Este é o padrão.
 .\deploy\Install.ps1 -ServerInstance "SQLSERVER01"
+
+# Recomeça do zero: apaga todos os dados, configuração e jobs do Agent.
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Fresh -Force
 
 # SQL auth
 .\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -SqlAuth -Login "sa" -Password "P@ss"
 ```
 
-O script executa cada arquivo `.sql` em ordem via `sqlcmd` e reporta sucesso/falha por arquivo.
+**O que uma atualização preserva.** Métricas coletadas, histórico de alertas, os
+seus valores em `[monitor].[Settings]` e `[monitor].[Thresholds]`, e qualquer
+agenda de job do Agent que você tenha ajustado. Procedures e views são
+atualizadas no lugar, colunas novas são adicionadas, e defaults novos são
+inseridos sem sobrescrever os seus.
+
+**O que ela recusa.** Um *downgrade* — este checkout mais antigo que o banco —
+a menos que você use `-Force`, porque fazer isso reverte correções de procedure
+sem avisar. E `-Mode Upgrade` contra um banco que não existe, que aponta para
+`-Mode Fresh` em vez de instalar sobre o nada.
+
+**Outras opções.** `-SkipJobs` para instâncias sem SQL Agent (Azure SQL Managed
+Instance). `-ResetSchedules` devolve as agendas dos jobs ao repositório.
+`-BackupPath <dir>` faz um `BACKUP DATABASE` antes. `-Mode Status` não escreve
+nada.
+
+> **Configuração é sua.** Uma atualização insere defaults novos, mas nunca
+> sobrescreve um valor que você definiu. Se uma release mudar um default,
+> instalações existentes mantêm o valor atual de propósito — veja
+> `install/migrations/README.md`.
+
+> **Instale a partir de uma tag, não do `main`.** `git clone --branch v1.1.0`
+> entrega exatamente aquela release. `-Mode Status` imprime a versão e o commit
+> que vai instalar, então você sempre sabe o que está prestes a rodar.
+
+O script para no primeiro arquivo que falha e diz qual é. Uma instalação parcial
+é reportada como falha, nunca como sucesso.
 
 ### Opção 2 — Manual (sqlcmd)
 
@@ -63,6 +95,7 @@ sqlcmd -S SQLSERVER01 -E -b -i install\06-alert-history.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\07-baselines.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\08-extended-schema.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\09-uptime-tracker.sql
+sqlcmd -S SQLSERVER01 -E -b -i install\10-phase1-3-schema.sql
 
 -- Coletores
 sqlcmd -S SQLSERVER01 -E -b -i collectors\collect_cpu.sql
@@ -73,7 +106,14 @@ sqlcmd -S SQLSERVER01 -E -b -i reports\html_builder_daily.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\html_builder_weekly.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\daily_health_check.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\weekly_deep_dive.sql
+
+-- Registra a versão por último. Não pule: sem ela, nada consegue dizer o que
+-- está instalado.
+sqlcmd -S SQLSERVER01 -E -b -d SQLHealthMonitor -v Version=1.1.0 -v Mode=Fresh -v Commit= -i install\99-record-version.sql
 ```
+
+Repare no `-C` a partir do sqlcmd 18: ele é obrigatório para confiar no
+certificado do servidor e não tem equivalente em variável de ambiente.
 
 ### Pós-instalação: configurar email
 

@@ -126,7 +126,48 @@ EXEC [monitor].[usp_GenerateWeeklyReport] @DebugMode = 1;
 
 ## Upgrading
 
-Re-run the deployment scripts. All procedures use `CREATE OR ALTER`, and tables use `IF NOT EXISTS`. Safe to re-run on existing installations.
+```powershell
+# See what is installed, what this checkout would install, and what is pending
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Status
+
+# Apply
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01"
+```
+
+An upgrade preserves collected metrics, alert history, your values in
+`[monitor].[Settings]` and `[monitor].[Thresholds]`, and Agent job schedules you
+adjusted. Procedures and views are updated in place, columns are added to
+existing tables, and new defaults are inserted without overwriting yours.
+
+It refuses to run when this checkout is **older** than the database, because
+downgrading silently reverts procedure fixes. Switch to the matching tag:
+
+```powershell
+git checkout v1.1.0
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01"
+```
+
+`LastVerifiedAt` in `[monitor].[SchemaVersion]` records the last run that
+reached the end of the chain. After a failed deployment, `-Mode Status` still
+reports the previous version — that is how you tell a half-finished upgrade
+from a complete one.
+
+### Changes that are not idempotent
+
+Most schema changes reconcile themselves. For renames, backfills and type
+changes, write a file in `install/migrations/` — see the README there. They
+are applied in version order and never run twice.
+
+### Publishing a release
+
+1. Update `CHANGELOG.md` with the new version.
+2. Update the `VERSION` file to match.
+3. Commit both.
+4. `git tag -a v1.2.0 -m "v1.2.0"` and `git push --tags`.
+5. Create the GitHub Release from the tag.
+
+`VERSION` and `CHANGELOG.md` must agree — `Install.ps1` reads `VERSION`, and
+nothing checks that the changelog was updated.
 
 ## Uninstalling
 

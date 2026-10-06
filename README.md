@@ -52,14 +52,45 @@ See [`grafana/README.md`](grafana/README.md) for setup instructions.
 ### Option 1 — Deploy script (recommended)
 
 ```powershell
-# Windows auth
+# What is installed, and what is this checkout? Read-only.
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Status
+
+# Install, or upgrade over an existing installation. This is the default.
 .\deploy\Install.ps1 -ServerInstance "SQLSERVER01"
+
+# Start over: deletes all data, configuration and Agent jobs.
+.\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Fresh -Force
 
 # SQL auth
 .\deploy\Install.ps1 -ServerInstance "SQLSERVER01" -SqlAuth -Login "sa" -Password "P@ss"
 ```
 
-The script runs each `.sql` file in order via `sqlcmd` and reports success/failure per file.
+**What an upgrade preserves.** Collected metrics, alert history, your values in
+`[monitor].[Settings]` and `[monitor].[Thresholds]`, and any Agent job schedule
+you adjusted. Procedures and views are updated in place, new columns are added,
+and new defaults are inserted without overwriting yours.
+
+**What it refuses.** A downgrade — this checkout older than the database — unless
+you pass `-Force`, because downgrading silently reverts procedure fixes. And
+`-Mode Upgrade` against a database that does not exist, which points you at
+`-Mode Fresh` instead of installing over nothing.
+
+**Other flags.** `-SkipJobs` for instances without SQL Agent (Azure SQL Managed
+Instance). `-ResetSchedules` hands the job schedules back to the repository.
+`-BackupPath <dir>` takes a `BACKUP DATABASE` first. `-Mode Status` writes
+nothing.
+
+> **Configuration is yours.** An upgrade inserts new defaults but never
+> overwrites a value you set. If a release changes a default, existing
+> installations keep their current one on purpose — see
+> `install/migrations/README.md`.
+
+> **Install from a tag, not from `main`.** `git clone --branch v1.1.0` gives you
+> exactly that release. `-Mode Status` prints the version and commit it will
+> deploy, so you always know what you are about to run.
+
+The script stops at the first failing file and names it. A partial install is
+reported as a failure, never as success.
 
 ### Option 2 — Manual (sqlcmd)
 
@@ -78,6 +109,7 @@ sqlcmd -S SQLSERVER01 -E -b -i install\06-alert-history.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\07-baselines.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\08-extended-schema.sql
 sqlcmd -S SQLSERVER01 -E -b -i install\09-uptime-tracker.sql
+sqlcmd -S SQLSERVER01 -E -b -i install\10-phase1-3-schema.sql
 
 -- Collectors
 sqlcmd -S SQLSERVER01 -E -b -i collectors\collect_cpu.sql
@@ -88,7 +120,14 @@ sqlcmd -S SQLSERVER01 -E -b -i reports\html_builder_daily.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\html_builder_weekly.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\daily_health_check.sql
 sqlcmd -S SQLSERVER01 -E -b -i reports\weekly_deep_dive.sql
+
+-- Records the version last. Do not skip it: without it, nothing can report
+-- what is installed.
+sqlcmd -S SQLSERVER01 -E -b -d SQLHealthMonitor -v Version=1.1.0 -v Mode=Fresh -v Commit= -i install\99-record-version.sql
 ```
+
+Note `-C` on sqlcmd 18 and later; it is required to trust the server
+certificate and has no environment-variable equivalent.
 
 ### Post-installation: configure email
 
