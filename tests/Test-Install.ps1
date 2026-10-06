@@ -177,6 +177,31 @@ END
 "@ | Out-Null
 }
 
+function Remove-Column {
+    <#
+    Drops a column the way an older installation would not have it.
+
+    A default constraint blocks DROP COLUMN outright, so any constraint the
+    column carries is removed first. Doing it here rather than by choosing a
+    column that happens to have no DEFAULT keeps the test from breaking the
+    next time someone adds one.
+    #>
+    param([string]$Table, [string]$Column)
+
+    Invoke-Sql -Db $Database -Query @"
+DECLARE @df NVARCHAR(400) = (
+    SELECT QUOTENAME(dc.name)
+    FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id = dc.parent_object_id
+                     AND c.column_id  = dc.parent_column_id
+    WHERE dc.parent_object_id = OBJECT_ID(N'[monitor].[$Table]')
+      AND c.name = N'$Column');
+IF @df IS NOT NULL
+    EXEC(N'ALTER TABLE [monitor].[$Table] DROP CONSTRAINT ' + @df);
+ALTER TABLE [monitor].[$Table] DROP COLUMN [$Column];
+"@ | Out-Null
+}
+
 function Invoke-Install {
     <#
     Runs deploy\Install.ps1 as a child process and captures its exit code.
@@ -384,9 +409,11 @@ WHERE LanguageCode='en' AND StringKey='report.daily.title';
 
         # The exact situation the IF OBJECT_ID guard creates: the table exists,
         # so the whole CREATE TABLE is skipped and its shape never changes.
-        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[MemoryHistory] DROP COLUMN [MemoryGrantsPending];" | Out-Null
-        $before = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.MemoryHistory','MemoryGrantsPending');"
-        Assert-True -Condition ([string]::IsNullOrEmpty($before[0])) -Message 'column absent before the re-run'
+        Remove-Column -Table 'MemoryHistory' -Column 'MemoryGrantsPending'
+        # sqlcmd renders a bare NULL as the literal text "NULL", so ISNULL makes
+        # the result unambiguous instead of comparing against emptiness.
+        $before = Invoke-Sql -Db $Database -Query "SELECT ISNULL(CAST(COL_LENGTH('monitor.MemoryHistory','MemoryGrantsPending') AS VARCHAR(10)), 'ABSENT');"
+        Assert-Equal -Expected 'ABSENT' -Actual $before[0] -Message 'column absent before the re-run'
 
         Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
 
@@ -397,7 +424,7 @@ WHERE LanguageCode='en' AND StringKey='report.daily.title';
     Invoke-Scenario 'Re-running 00 restores a computed column' {
         # HoursSinceLastBackup is AS DATEDIFF(...) -- COL_LENGTH does not probe
         # computed columns, so this needs sys.computed_columns.
-        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[BackupHistory] DROP COLUMN [HoursSinceLastBackup];" | Out-Null
+        Remove-Column -Table 'BackupHistory' -Column 'HoursSinceLastBackup'
 
         Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
 
@@ -410,11 +437,11 @@ WHERE object_id = OBJECT_ID('monitor.BackupHistory') AND name = 'HoursSinceLastB
 
     Invoke-Scenario 'Re-running 08-extended-schema adds missing columns' {
         Invoke-Sql -Db $Database -File 'install\08-extended-schema.sql' | Out-Null
-        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[TempDbObjectUsage] DROP COLUMN [UserObjectsMB];" | Out-Null
+        Remove-Column -Table 'TempDbObjectUsage' -Column 'ObjectName'
 
         Invoke-Sql -Db $Database -File 'install\08-extended-schema.sql' | Out-Null
 
-        $c = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.TempDbObjectUsage','UserObjectsMB');"
+        $c = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.TempDbObjectUsage','ObjectName');"
         Assert-True -Condition (-not [string]::IsNullOrEmpty($c[0])) -Message 'extended-schema column restored'
     }
 
