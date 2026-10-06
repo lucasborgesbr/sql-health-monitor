@@ -282,6 +282,7 @@ $scripts = @(
     "maintenance\update_baselines.sql",
     "views\vw_CurrentHealth.sql",
     "views\vw_UptimeTracker.sql",
+    "install\11-health-check.sql",
     "install\99-record-version.sql"
 )
 

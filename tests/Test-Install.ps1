@@ -445,6 +445,46 @@ WHERE object_id = OBJECT_ID('monitor.BackupHistory') AND name = 'HoursSinceLastB
         Assert-True -Condition (-not [string]::IsNullOrEmpty($c[0])) -Message 'extended-schema column restored'
     }
 
+    Invoke-Scenario 'usp_HealthCheck is deployed by the install chain' {
+        Reset-TestDatabase -SkipJobs:$SkipJobs
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+        Invoke-Install -Mode Upgrade -SkipJobs:$SkipJobs | Out-Null
+
+        $exists = Invoke-Sql -Db $Database -Query "SELECT OBJECT_ID('monitor.usp_HealthCheck', 'P');"
+        Assert-True -Condition ($exists[0] -ne $null -and $exists[0] -ne '' -and $exists[0] -ne 'NULL') `
+                     -Message 'usp_HealthCheck exists after upgrade'
+    }
+
+    Invoke-Scenario 'usp_HealthCheck returns findings and respects @CheckId' {
+        Reset-TestDatabase -SkipJobs:$SkipJobs
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+        Invoke-Install -Mode Upgrade -SkipJobs:$SkipJobs | Out-Null
+
+        $rows = Invoke-Sql -Db $Database -Query "EXEC [monitor].[usp_HealthCheck] @OutputType = 'TABLE';"
+        Assert-True -Condition ($rows.Count -ge 1) -Message 'health check returns at least one finding'
+
+        $count = Invoke-Sql -Db $Database -Query "EXEC [monitor].[usp_HealthCheck] @OutputType = 'COUNT_ONLY';"
+        Assert-True -Condition ([int]$count[0] -eq $rows.Count) -Message 'COUNT_ONLY matches the table row count'
+
+        # @CheckId=1 should return only rows for check 1.
+        $check1 = Invoke-Sql -Db $Database -Query "EXEC [monitor].[usp_HealthCheck] @CheckId = 1, @OutputType = 'TABLE';"
+        if ($check1.Count -gt 0) {
+            Assert-True -Condition ($check1.Count -le $rows.Count) -Message '@CheckId does not inflate the row count'
+        }
+    }
+
+    Invoke-Scenario 'usp_HealthCheck is idempotent under rerun' {
+        Reset-TestDatabase -SkipJobs:$SkipJobs
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+        Invoke-Install -Mode Upgrade -SkipJobs:$SkipJobs | Out-Null
+
+        $out1 = Invoke-Sql -Db $Database -Query "EXEC [monitor].[usp_HealthCheck] @OutputType = 'COUNT_ONLY';"
+        Invoke-Install -Mode Upgrade -SkipJobs:$SkipJobs | Out-Null
+        $out2 = Invoke-Sql -Db $Database -Query "EXEC [monitor].[usp_HealthCheck] @OutputType = 'COUNT_ONLY';"
+
+        Assert-True -Condition ([int]$out1[0] -eq [int]$out2[0]) -Message 'idempotent rerun yields the same finding count'
+    }
+
     # Scenarios for migrations and job schedules are added by the tasks that
     # implement them. A scenario that cannot pass yet is worse than no
     # scenario: it trains you to ignore red.

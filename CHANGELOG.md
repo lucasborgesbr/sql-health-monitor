@@ -51,8 +51,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not reach existing installations — that needs a migration.
 - Install from a tag, not from `main`. `git clone --branch v1.1.0` gives you
   exactly that release.
-- `diagnostics/usp_HealthCheck.sql` is not in the install chain. It has never
-  run; verifying it is separate work.
+
+## [1.1.1] - 2026-10-06
+
+### Added
+- `diagnostics/usp_HealthCheck.sql` rewritten to 10 verified checks and
+  deployed by `install/11-health-check.sql` (replaces the 574-line stub that
+  had never run). The procedure accepts `@CheckId`, `@OutputType` (`TABLE` |
+  `TEXT` | `COUNT_ONLY`) and `@DatabaseName` so it can be triggered on demand
+  or wired into a job.
+- `README-PTBR.md` documents the on-demand health check.
+
+### Fixed
+- `CheckId` filter used to compare against the IDENTITY column, so a single
+  check never returned its findings on re-runs. The new layout stores the
+  source check number in a non-IDENTITY column and uses it for filtering.
 
 ## [1.0.0] - 2026-06-02
 

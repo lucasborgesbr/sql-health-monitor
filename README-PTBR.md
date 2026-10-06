@@ -349,6 +349,31 @@ SELECT * FROM [monitor].[vw_UptimeDashboard];
 SELECT * FROM [monitor].[vw_SLAComplianceHistory];
 ```
 
+### Health check sob demanda
+
+Para uma triagem rápida, sem esperar o relatório diário rodar:
+
+```sql
+-- Tabela com todos os achados
+EXEC [monitor].[usp_HealthCheck];
+
+-- Texto formatado para copiar em ticket
+EXEC [monitor].[usp_HealthCheck] @OutputType = 'TEXT';
+
+-- Apenas a contagem (para alerta "se passar de X achados críticos")
+EXEC [monitor].[usp_HealthCheck] @OutputType = 'COUNT_ONLY';
+
+-- Filtrar por um check específico
+EXEC [monitor].[usp_HealthCheck] @CheckId = 1;  -- só backups antigos
+
+-- Filtrar por banco
+EXEC [monitor].[usp_HealthCheck] @DatabaseName = 'Vendas';
+```
+
+10 checks: backup ausente, espaço crítico, suspect pages, SQL Agent parado,
+auto-close/auto-shrink ligados, estatísticas desatualizadas, fragmentação de
+índices, query de alto CPU, waits acumulados e owner como `sa`.
+
 ## Resolução de Problemas
 
 ```sql
