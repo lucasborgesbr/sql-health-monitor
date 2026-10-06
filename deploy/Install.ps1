@@ -340,7 +340,7 @@ if ($Mode -eq 'Status') {
         Write-Host ""
         Write-Host "  Agent jobs:" -ForegroundColor Cyan
         try {
-            $jobs = @(Invoke-Sql -Db 'msdb' -Query @"
+            $jobs = Invoke-Sql -Db 'msdb' -Query @"
 SELECT j.name, j.enabled
 FROM msdb.dbo.sysjobs j
 WHERE j.name LIKE N'SQL Health Monitor%'
@@ -373,7 +373,7 @@ if ($Mode -eq 'Fresh') {
     # "could not find stored procedure" for every collector.
     if (-not $SkipJobs -and (Test-DatabaseExists)) {
         Write-Host "  Stopping Agent jobs..." -ForegroundColor Yellow
-        foreach ($j in @(Invoke-Sql -Db 'msdb' -Query "SELECT name FROM msdb.dbo.sysjobs WHERE name LIKE N'SQL Health Monitor%';")) {
+        foreach ($j in (Invoke-Sql -Db 'msdb' -Query "SELECT name FROM msdb.dbo.sysjobs WHERE name LIKE N'SQL Health Monitor%';")) {
             Invoke-Sql -Db 'msdb' -Query "EXEC msdb.dbo.sp_update_job @job_name = N'$j', @enabled = 0;" | Out-Null
         }
     }
