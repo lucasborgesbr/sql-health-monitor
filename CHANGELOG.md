@@ -67,6 +67,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check never returned its findings on re-runs. The new layout stores the
   source check number in a non-IDENTITY column and uses it for filtering.
 
+## [1.1.2] - 2026-10-06
+
+### Added
+- `install/00-compat-checks.sql` runs first and aborts the install on SQL
+  Server 2008 or earlier.
+- `install/11-health-check-2016.sql`, `install/12-collectors-2016.sql` and
+  `install/13-baselines-2017.sql` guard the three scripts that use
+  features added after SQL Server 2012:
+    - `sys.dm_db_stats_properties` (2016+)
+    - `sys.query_store_*` views (2016+)
+    - `STRING_AGG` and `PERCENTILE_CONT` (2017+)
+  The guards return early with a notice rather than letting the parser
+  fail mid-deploy.
+- `README-PTBR.md` documents the per-version skip matrix.
+
+### Changed
+- The minimum supported SQL Server is now 2012 (was 2016 by accident of
+  `usp_HealthCheck` and the query-store collector). All 2012+ features
+  in the install chain were verified; 2016+ and 2017+ features are
+  guarded by the new files.
+- `diagnostics/usp_HealthCheck.sql` uses `CREATE PROCEDURE`; idempotency
+  is owned by `install/11-health-check-2016.sql`.
+
 ## [1.0.0] - 2026-06-02
 
 ### Added
