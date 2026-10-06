@@ -378,6 +378,46 @@ WHERE LanguageCode='en' AND StringKey='report.daily.title';
         Assert-True -Condition ($f.Output -match 'Force') -Message 'the message names -Force'
     }
 
+    Invoke-Scenario 'Re-running 00 restores a column an older install would not have' {
+        Reset-TestDatabase
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+
+        # The exact situation the IF OBJECT_ID guard creates: the table exists,
+        # so the whole CREATE TABLE is skipped and its shape never changes.
+        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[MemoryHistory] DROP COLUMN [MemoryGrantsPending];" | Out-Null
+        $before = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.MemoryHistory','MemoryGrantsPending');"
+        Assert-True -Condition ([string]::IsNullOrEmpty($before[0])) -Message 'column absent before the re-run'
+
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+
+        $after = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.MemoryHistory','MemoryGrantsPending');"
+        Assert-True -Condition (-not [string]::IsNullOrEmpty($after[0])) -Message 'column restored on re-run'
+    }
+
+    Invoke-Scenario 'Re-running 00 restores a computed column' {
+        # HoursSinceLastBackup is AS DATEDIFF(...) -- COL_LENGTH does not probe
+        # computed columns, so this needs sys.computed_columns.
+        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[BackupHistory] DROP COLUMN [HoursSinceLastBackup];" | Out-Null
+
+        Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
+
+        $c = Invoke-Sql -Db $Database -Query @"
+SELECT CAST(COUNT(*) AS VARCHAR(10)) FROM [$Database].sys.computed_columns
+WHERE object_id = OBJECT_ID('monitor.BackupHistory') AND name = 'HoursSinceLastBackup';
+"@
+        Assert-Equal -Expected '1' -Actual $c[0] -Message 'computed column restored'
+    }
+
+    Invoke-Scenario 'Re-running 08-extended-schema adds missing columns' {
+        Invoke-Sql -Db $Database -File 'install\08-extended-schema.sql' | Out-Null
+        Invoke-Sql -Db $Database -Query "ALTER TABLE [$Database].[monitor].[TempDbObjectUsage] DROP COLUMN [UserObjectsMB];" | Out-Null
+
+        Invoke-Sql -Db $Database -File 'install\08-extended-schema.sql' | Out-Null
+
+        $c = Invoke-Sql -Db $Database -Query "SELECT COL_LENGTH('monitor.TempDbObjectUsage','UserObjectsMB');"
+        Assert-True -Condition (-not [string]::IsNullOrEmpty($c[0])) -Message 'extended-schema column restored'
+    }
+
     # Scenarios for migrations and job schedules are added by the tasks that
     # implement them. A scenario that cannot pass yet is worse than no
     # scenario: it trains you to ignore red.

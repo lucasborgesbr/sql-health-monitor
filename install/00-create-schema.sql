@@ -45,10 +45,29 @@ CREATE TABLE [monitor].[SchemaVersion] (
     LastVerifiedAt   DATETIME2     NULL,       -- last run that reached the end of the chain
     INDEX IX_SchemaVersion_Id (Id DESC)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.SchemaVersion', 'Version') IS NULL
+    ALTER TABLE [monitor].[SchemaVersion] ADD Version VARCHAR(20) NULL;
 GO
 
--- Escape hatch for changes that cannot be written idempotently. See
--- install\migrations\README.md.
+IF COL_LENGTH('monitor.SchemaVersion', 'PreviousVersion') IS NULL
+    ALTER TABLE [monitor].[SchemaVersion] ADD PreviousVersion VARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.SchemaVersion', 'InstallMode') IS NULL
+    ALTER TABLE [monitor].[SchemaVersion] ADD InstallMode VARCHAR(10) NULL;
+GO
+
+IF COL_LENGTH('monitor.SchemaVersion', 'InstalledBy') IS NULL
+    ALTER TABLE [monitor].[SchemaVersion] ADD InstalledBy NVARCHAR(128) NULL DEFAULT SUSER_SNAME();
+GO
+
+IF COL_LENGTH('monitor.SchemaVersion', 'CommitHash') IS NULL
+    ALTER TABLE [monitor].[SchemaVersion] ADD CommitHash VARCHAR(40) NULL;
+GO
+
 IF OBJECT_ID('monitor.AppliedMigrations', 'U') IS NULL
 CREATE TABLE [monitor].[AppliedMigrations] (
     FileName     NVARCHAR(255) NOT NULL PRIMARY KEY,
@@ -56,11 +75,25 @@ CREATE TABLE [monitor].[AppliedMigrations] (
     AppliedAt    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
     AppliedBy    NVARCHAR(128) NOT NULL DEFAULT SUSER_SNAME()
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.AppliedMigrations', 'FileName') IS NULL
+    ALTER TABLE [monitor].[AppliedMigrations] ADD FileName NVARCHAR(255) NULL;
 GO
 
--- Returns the most recently applied version, or NULL if nothing is recorded
--- yet -- which is the normal state for an installation that predates version
--- tracking. Follows the repository's placeholder+ALTER pattern.
+IF COL_LENGTH('monitor.AppliedMigrations', 'Version') IS NULL
+    ALTER TABLE [monitor].[AppliedMigrations] ADD Version VARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.AppliedMigrations', 'AppliedAt') IS NULL
+    ALTER TABLE [monitor].[AppliedMigrations] ADD AppliedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
+GO
+
+IF COL_LENGTH('monitor.AppliedMigrations', 'AppliedBy') IS NULL
+    ALTER TABLE [monitor].[AppliedMigrations] ADD AppliedBy NVARCHAR(128) NULL DEFAULT SUSER_SNAME();
+GO
+
 IF OBJECT_ID('[monitor].[fn_GetInstalledVersion]', 'FN') IS NOT NULL
     EXEC('ALTER FUNCTION [monitor].[fn_GetInstalledVersion]() RETURNS VARCHAR(20) AS BEGIN RETURN NULL; END;');
 GO
@@ -99,9 +132,37 @@ CREATE TABLE [monitor].[Settings] (
     ModifiedBy      NVARCHAR(128) NOT NULL DEFAULT SUSER_SNAME(),
     CONSTRAINT UQ_Settings_Name UNIQUE (Category, SettingName)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.Settings', 'Category') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD Category NVARCHAR(50) NULL;
 GO
 
--- Language strings for multi-language reports
+IF COL_LENGTH('monitor.Settings', 'SettingName') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD SettingName NVARCHAR(100) NULL;
+GO
+
+IF COL_LENGTH('monitor.Settings', 'SettingValue') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD SettingValue NVARCHAR(500) NULL;
+GO
+
+IF COL_LENGTH('monitor.Settings', 'Description') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD Description NVARCHAR(500) NULL;
+GO
+
+IF COL_LENGTH('monitor.Settings', 'DataType') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD DataType NVARCHAR(20) NULL DEFAULT 'string';
+GO
+
+IF COL_LENGTH('monitor.Settings', 'ModifiedDate') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD ModifiedDate DATETIME2 NULL DEFAULT SYSUTCDATETIME();
+GO
+
+IF COL_LENGTH('monitor.Settings', 'ModifiedBy') IS NULL
+    ALTER TABLE [monitor].[Settings] ADD ModifiedBy NVARCHAR(128) NULL DEFAULT SUSER_SNAME();
+GO
+
 IF OBJECT_ID('monitor.Languages', 'U') IS NULL
 CREATE TABLE [monitor].[Languages] (
     LanguageId      INT IDENTITY(1,1) PRIMARY KEY,
@@ -110,9 +171,17 @@ CREATE TABLE [monitor].[Languages] (
     StringValue     NVARCHAR(MAX) NOT NULL,
     CONSTRAINT UQ_Languages_Key UNIQUE (LanguageCode, StringKey)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.Languages', 'LanguageCode') IS NULL
+    ALTER TABLE [monitor].[Languages] ADD LanguageCode CHAR(5) NULL;
 GO
 
--- Alert thresholds
+IF COL_LENGTH('monitor.Languages', 'StringValue') IS NULL
+    ALTER TABLE [monitor].[Languages] ADD StringValue NVARCHAR(MAX) NULL;
+GO
+
 IF OBJECT_ID('monitor.Thresholds', 'U') IS NULL
 CREATE TABLE [monitor].[Thresholds] (
     ThresholdId     INT IDENTITY(1,1) PRIMARY KEY,
@@ -124,13 +193,29 @@ CREATE TABLE [monitor].[Thresholds] (
     Description     NVARCHAR(500) NULL,
     CONSTRAINT UQ_Thresholds_Metric UNIQUE (MetricName)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.Thresholds', 'MetricName') IS NULL
+    ALTER TABLE [monitor].[Thresholds] ADD MetricName NVARCHAR(100) NULL;
 GO
 
-----------------------------------------------------------------------
--- DATA COLLECTION TABLES
-----------------------------------------------------------------------
+IF COL_LENGTH('monitor.Thresholds', 'WarningValue') IS NULL
+    ALTER TABLE [monitor].[Thresholds] ADD WarningValue DECIMAL(18,2) NULL;
+GO
 
--- CPU utilization history
+IF COL_LENGTH('monitor.Thresholds', 'CriticalValue') IS NULL
+    ALTER TABLE [monitor].[Thresholds] ADD CriticalValue DECIMAL(18,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.Thresholds', 'Operator') IS NULL
+    ALTER TABLE [monitor].[Thresholds] ADD Operator CHAR(2) NULL DEFAULT '>=';
+GO
+
+IF COL_LENGTH('monitor.Thresholds', 'Description') IS NULL
+    ALTER TABLE [monitor].[Thresholds] ADD Description NVARCHAR(500) NULL;
+GO
+
 IF OBJECT_ID('monitor.CpuHistory', 'U') IS NULL
 CREATE TABLE [monitor].[CpuHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -140,9 +225,25 @@ CREATE TABLE [monitor].[CpuHistory] (
     IdleCpuPct      TINYINT       NOT NULL,
     INDEX IX_CpuHistory_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.CpuHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[CpuHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Memory metrics
+IF COL_LENGTH('monitor.CpuHistory', 'SqlCpuPct') IS NULL
+    ALTER TABLE [monitor].[CpuHistory] ADD SqlCpuPct TINYINT NULL;
+GO
+
+IF COL_LENGTH('monitor.CpuHistory', 'SystemCpuPct') IS NULL
+    ALTER TABLE [monitor].[CpuHistory] ADD SystemCpuPct TINYINT NULL;
+GO
+
+IF COL_LENGTH('monitor.CpuHistory', 'IdleCpuPct') IS NULL
+    ALTER TABLE [monitor].[CpuHistory] ADD IdleCpuPct TINYINT NULL;
+GO
+
 IF OBJECT_ID('monitor.MemoryHistory', 'U') IS NULL
 CREATE TABLE [monitor].[MemoryHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -155,9 +256,37 @@ CREATE TABLE [monitor].[MemoryHistory] (
     MemoryGrantsPending   INT     NOT NULL DEFAULT 0,
     INDEX IX_MemoryHistory_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.MemoryHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Disk space and IO
+IF COL_LENGTH('monitor.MemoryHistory', 'TotalServerMemoryMB') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD TotalServerMemoryMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.MemoryHistory', 'TargetServerMemoryMB') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD TargetServerMemoryMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.MemoryHistory', 'AvailableMemoryMB') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD AvailableMemoryMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.MemoryHistory', 'PageLifeExpectancy') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD PageLifeExpectancy INT NULL;
+GO
+
+IF COL_LENGTH('monitor.MemoryHistory', 'BufferCacheHitRatio') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD BufferCacheHitRatio DECIMAL(5,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.MemoryHistory', 'MemoryGrantsPending') IS NULL
+    ALTER TABLE [monitor].[MemoryHistory] ADD MemoryGrantsPending INT NULL DEFAULT 0;
+GO
+
 IF OBJECT_ID('monitor.DiskHistory', 'U') IS NULL
 CREATE TABLE [monitor].[DiskHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -170,9 +299,37 @@ CREATE TABLE [monitor].[DiskHistory] (
     AvgWriteLatencyMs DECIMAL(10,2) NULL,
     INDEX IX_DiskHistory_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.DiskHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Wait stats (delta snapshots)
+IF COL_LENGTH('monitor.DiskHistory', 'DriveLetter') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD DriveLetter CHAR(3) NULL;
+GO
+
+IF COL_LENGTH('monitor.DiskHistory', 'TotalSpaceMB') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD TotalSpaceMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.DiskHistory', 'FreeSpaceMB') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD FreeSpaceMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.DiskHistory', 'UsedPct') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD UsedPct DECIMAL(5,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.DiskHistory', 'AvgReadLatencyMs') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD AvgReadLatencyMs DECIMAL(10,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.DiskHistory', 'AvgWriteLatencyMs') IS NULL
+    ALTER TABLE [monitor].[DiskHistory] ADD AvgWriteLatencyMs DECIMAL(10,2) NULL;
+GO
+
 IF OBJECT_ID('monitor.WaitStatsHistory', 'U') IS NULL
 CREATE TABLE [monitor].[WaitStatsHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -185,9 +342,33 @@ CREATE TABLE [monitor].[WaitStatsHistory] (
     INDEX IX_WaitStats_Date NONCLUSTERED (CollectedAt),
     INDEX IX_WaitStats_Type NONCLUSTERED (WaitType, CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.WaitStatsHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Blocking events
+IF COL_LENGTH('monitor.WaitStatsHistory', 'WaitType') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD WaitType NVARCHAR(120) NULL;
+GO
+
+IF COL_LENGTH('monitor.WaitStatsHistory', 'WaitingTasksCount') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD WaitingTasksCount BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.WaitStatsHistory', 'WaitTimeMs') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD WaitTimeMs BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.WaitStatsHistory', 'SignalWaitTimeMs') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD SignalWaitTimeMs BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.WaitStatsHistory', 'DeltaWaitTimeMs') IS NULL
+    ALTER TABLE [monitor].[WaitStatsHistory] ADD DeltaWaitTimeMs BIGINT NULL;
+GO
+
 IF OBJECT_ID('monitor.BlockingHistory', 'U') IS NULL
 CREATE TABLE [monitor].[BlockingHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -201,9 +382,41 @@ CREATE TABLE [monitor].[BlockingHistory] (
     WaitType        NVARCHAR(120) NULL,
     INDEX IX_Blocking_Date NONCLUSTERED (DetectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.BlockingHistory', 'DetectedAt') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD DetectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- AG health
+IF COL_LENGTH('monitor.BlockingHistory', 'BlockingSpid') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD BlockingSpid INT NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'BlockedSpid') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD BlockedSpid INT NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'BlockingDurationSec') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD BlockingDurationSec INT NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'BlockingQuery') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD BlockingQuery NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'BlockedQuery') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD BlockedQuery NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.BlockingHistory', 'WaitType') IS NULL
+    ALTER TABLE [monitor].[BlockingHistory] ADD WaitType NVARCHAR(120) NULL;
+GO
+
 IF OBJECT_ID('monitor.AgHealthHistory', 'U') IS NULL
 CREATE TABLE [monitor].[AgHealthHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -220,9 +433,49 @@ CREATE TABLE [monitor].[AgHealthHistory] (
     INDEX IX_AgHealth_Date NONCLUSTERED (CollectedAt),
     INDEX IX_AgHealth_AG NONCLUSTERED (AgName, CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.AgHealthHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- CDC health
+IF COL_LENGTH('monitor.AgHealthHistory', 'AgName') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD AgName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'ReplicaServer') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD ReplicaServer NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'SyncState') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD SyncState NVARCHAR(60) NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'SyncHealth') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD SyncHealth NVARCHAR(60) NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'LogSendQueueSizeKB') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD LogSendQueueSizeKB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'RedoQueueSizeKB') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD RedoQueueSizeKB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'LastCommitTime') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD LastCommitTime DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.AgHealthHistory', 'SecondsBehindPrimary') IS NULL
+    ALTER TABLE [monitor].[AgHealthHistory] ADD SecondsBehindPrimary INT NULL;
+GO
+
 IF OBJECT_ID('monitor.CdcHealthHistory', 'U') IS NULL
 CREATE TABLE [monitor].[CdcHealthHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -236,9 +489,41 @@ CREATE TABLE [monitor].[CdcHealthHistory] (
     RetentionMinutes INT          NULL,
     INDEX IX_CdcHealth_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.CdcHealthHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Top queries
+IF COL_LENGTH('monitor.CdcHealthHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'CaptureJobStatus') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD CaptureJobStatus NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'CleanupJobStatus') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD CleanupJobStatus NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'LatencySeconds') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD LatencySeconds INT NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'MinLsn') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD MinLsn NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'MaxLsn') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD MaxLsn NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('monitor.CdcHealthHistory', 'RetentionMinutes') IS NULL
+    ALTER TABLE [monitor].[CdcHealthHistory] ADD RetentionMinutes INT NULL;
+GO
+
 IF OBJECT_ID('monitor.TopQueriesHistory', 'U') IS NULL
 CREATE TABLE [monitor].[TopQueriesHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -254,9 +539,49 @@ CREATE TABLE [monitor].[TopQueriesHistory] (
     PlanHandle      VARBINARY(64) NULL,
     INDEX IX_TopQueries_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.TopQueriesHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Index health
+IF COL_LENGTH('monitor.TopQueriesHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'QueryHash') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD QueryHash BINARY(8) NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'TotalCpuMs') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD TotalCpuMs BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'TotalReads') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD TotalReads BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'TotalWrites') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD TotalWrites BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'ExecutionCount') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD ExecutionCount BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'AvgDurationMs') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD AvgDurationMs BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'QueryText') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD QueryText NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.TopQueriesHistory', 'PlanHandle') IS NULL
+    ALTER TABLE [monitor].[TopQueriesHistory] ADD PlanHandle VARBINARY(64) NULL;
+GO
+
 IF OBJECT_ID('monitor.IndexHealthHistory', 'U') IS NULL
 CREATE TABLE [monitor].[IndexHealthHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -274,9 +599,57 @@ CREATE TABLE [monitor].[IndexHealthHistory] (
     UserUpdates     BIGINT        NULL,
     INDEX IX_IndexHealth_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.IndexHealthHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Backup status
+IF COL_LENGTH('monitor.IndexHealthHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'SchemaName') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD SchemaName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'TableName') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD TableName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'IndexName') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD IndexName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'IndexType') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD IndexType NVARCHAR(60) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'FragmentationPct') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD FragmentationPct DECIMAL(5,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'PageCount') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD PageCount BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'UserSeeks') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD UserSeeks BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'UserScans') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD UserScans BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'UserLookups') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD UserLookups BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.IndexHealthHistory', 'UserUpdates') IS NULL
+    ALTER TABLE [monitor].[IndexHealthHistory] ADD UserUpdates BIGINT NULL;
+GO
+
 IF OBJECT_ID('monitor.BackupHistory', 'U') IS NULL
 CREATE TABLE [monitor].[BackupHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -290,9 +663,37 @@ CREATE TABLE [monitor].[BackupHistory] (
     HoursSinceLastBackup AS DATEDIFF(HOUR, LastBackupDate, SYSUTCDATETIME()),
     INDEX IX_BackupHistory_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.BackupHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- SQL Agent job history
+IF COL_LENGTH('monitor.BackupHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.BackupHistory', 'BackupType') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD BackupType CHAR(1) NULL;
+GO
+
+IF COL_LENGTH('monitor.BackupHistory', 'BackupSizeMB') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD BackupSizeMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.BackupHistory', 'CompressedSizeMB') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD CompressedSizeMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.BackupHistory', 'DurationSeconds') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD DurationSeconds INT NULL;
+GO
+
+IF COL_LENGTH('monitor.BackupHistory', 'HoursSinceLastBackup') IS NULL
+    ALTER TABLE [monitor].[BackupHistory] ADD HoursSinceLastBackup AS DATEDIFF(HOUR, LastBackupDate, SYSUTCDATETIME());
+GO
+
 IF OBJECT_ID('monitor.JobHistory', 'U') IS NULL
 CREATE TABLE [monitor].[JobHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -305,9 +706,29 @@ CREATE TABLE [monitor].[JobHistory] (
     IsEnabled       BIT           NOT NULL,
     INDEX IX_JobHistory_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.JobHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[JobHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- TempDB usage
+IF COL_LENGTH('monitor.JobHistory', 'JobName') IS NULL
+    ALTER TABLE [monitor].[JobHistory] ADD JobName NVARCHAR(256) NULL;
+GO
+
+IF COL_LENGTH('monitor.JobHistory', 'LastRunDate') IS NULL
+    ALTER TABLE [monitor].[JobHistory] ADD LastRunDate DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.JobHistory', 'LastRunStatus') IS NULL
+    ALTER TABLE [monitor].[JobHistory] ADD LastRunStatus NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.JobHistory', 'IsEnabled') IS NULL
+    ALTER TABLE [monitor].[JobHistory] ADD IsEnabled BIT NULL;
+GO
+
 IF OBJECT_ID('monitor.TempDbHistory', 'U') IS NULL
 CREATE TABLE [monitor].[TempDbHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -320,9 +741,37 @@ CREATE TABLE [monitor].[TempDbHistory] (
     InternalObjectsMB BIGINT      NULL,
     INDEX IX_TempDb_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.TempDbHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Database file growth
+IF COL_LENGTH('monitor.TempDbHistory', 'TotalSizeMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD TotalSizeMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TempDbHistory', 'UsedSpaceMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD UsedSpaceMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TempDbHistory', 'FreeSpaceMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD FreeSpaceMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TempDbHistory', 'VersionStoreMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD VersionStoreMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TempDbHistory', 'UserObjectsMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD UserObjectsMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.TempDbHistory', 'InternalObjectsMB') IS NULL
+    ALTER TABLE [monitor].[TempDbHistory] ADD InternalObjectsMB BIGINT NULL;
+GO
+
 IF OBJECT_ID('monitor.FileGrowthHistory', 'U') IS NULL
 CREATE TABLE [monitor].[FileGrowthHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -335,9 +784,33 @@ CREATE TABLE [monitor].[FileGrowthHistory] (
     GrowthMB        BIGINT        NULL,      -- Delta from previous collection
     INDEX IX_FileGrowth_Date NONCLUSTERED (CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.FileGrowthHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Error log entries
+IF COL_LENGTH('monitor.FileGrowthHistory', 'DatabaseName') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD DatabaseName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.FileGrowthHistory', 'FileName') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD FileName NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.FileGrowthHistory', 'FileType') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD FileType NVARCHAR(10) NULL;
+GO
+
+IF COL_LENGTH('monitor.FileGrowthHistory', 'UsedMB') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD UsedMB BIGINT NULL;
+GO
+
+IF COL_LENGTH('monitor.FileGrowthHistory', 'GrowthMB') IS NULL
+    ALTER TABLE [monitor].[FileGrowthHistory] ADD GrowthMB BIGINT NULL;
+GO
+
 IF OBJECT_ID('monitor.ErrorLogHistory', 'U') IS NULL
 CREATE TABLE [monitor].[ErrorLogHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -349,9 +822,29 @@ CREATE TABLE [monitor].[ErrorLogHistory] (
     INDEX IX_ErrorLog_Date NONCLUSTERED (CollectedAt),
     INDEX IX_ErrorLog_Severity NONCLUSTERED (Severity, CollectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.ErrorLogHistory', 'CollectedAt') IS NULL
+    ALTER TABLE [monitor].[ErrorLogHistory] ADD CollectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Alert history (fired alerts)
+IF COL_LENGTH('monitor.ErrorLogHistory', 'LogDate') IS NULL
+    ALTER TABLE [monitor].[ErrorLogHistory] ADD LogDate DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.ErrorLogHistory', 'ProcessInfo') IS NULL
+    ALTER TABLE [monitor].[ErrorLogHistory] ADD ProcessInfo NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('monitor.ErrorLogHistory', 'ErrorMessage') IS NULL
+    ALTER TABLE [monitor].[ErrorLogHistory] ADD ErrorMessage NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.ErrorLogHistory', 'Severity') IS NULL
+    ALTER TABLE [monitor].[ErrorLogHistory] ADD Severity NVARCHAR(20) NULL;
+GO
+
 IF OBJECT_ID('monitor.AlertHistory', 'U') IS NULL
 CREATE TABLE [monitor].[AlertHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -367,9 +860,41 @@ CREATE TABLE [monitor].[AlertHistory] (
     INDEX IX_AlertHistory_Date NONCLUSTERED (FiredAt),
     INDEX IX_AlertHistory_Severity NONCLUSTERED (Severity, FiredAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.AlertHistory', 'FiredAt') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD FiredAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Report history (sent reports)
+IF COL_LENGTH('monitor.AlertHistory', 'MetricName') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD MetricName NVARCHAR(100) NULL;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'Severity') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD Severity NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'ThresholdValue') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD ThresholdValue DECIMAL(18,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'Message') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD Message NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'Acknowledged') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD Acknowledged BIT NULL DEFAULT 0;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'AcknowledgedBy') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD AcknowledgedBy NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.AlertHistory', 'AcknowledgedAt') IS NULL
+    ALTER TABLE [monitor].[AlertHistory] ADD AcknowledgedAt DATETIME2 NULL;
+GO
+
 IF OBJECT_ID('monitor.ReportHistory', 'U') IS NULL
 CREATE TABLE [monitor].[ReportHistory] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -380,9 +905,29 @@ CREATE TABLE [monitor].[ReportHistory] (
     Success         BIT           NOT NULL DEFAULT 1,
     ErrorMessage    NVARCHAR(MAX) NULL
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.ReportHistory', 'SentAt') IS NULL
+    ALTER TABLE [monitor].[ReportHistory] ADD SentAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
 GO
 
--- Recommendations table
+IF COL_LENGTH('monitor.ReportHistory', 'ReportType') IS NULL
+    ALTER TABLE [monitor].[ReportHistory] ADD ReportType NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('monitor.ReportHistory', 'Language') IS NULL
+    ALTER TABLE [monitor].[ReportHistory] ADD Language CHAR(5) NULL;
+GO
+
+IF COL_LENGTH('monitor.ReportHistory', 'Success') IS NULL
+    ALTER TABLE [monitor].[ReportHistory] ADD Success BIT NULL DEFAULT 1;
+GO
+
+IF COL_LENGTH('monitor.ReportHistory', 'ErrorMessage') IS NULL
+    ALTER TABLE [monitor].[ReportHistory] ADD ErrorMessage NVARCHAR(MAX) NULL;
+GO
+
 IF OBJECT_ID('monitor.Recommendations', 'U') IS NULL
 CREATE TABLE [monitor].[Recommendations] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -397,10 +942,37 @@ CREATE TABLE [monitor].[Recommendations] (
     INDEX IX_Recommendations_Date NONCLUSTERED (CreatedAt),
     INDEX IX_Recommendations_Priority NONCLUSTERED (Priority, CreatedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.Recommendations', 'MetricName') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD MetricName NVARCHAR(100) NULL;
 GO
 
--- Uptime Tracker tables
--- Incident classification for SLA tracking
+IF COL_LENGTH('monitor.Recommendations', 'CurrentValue') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD CurrentValue DECIMAL(18,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.Recommendations', 'Recommendation') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD Recommendation NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.Recommendations', 'Priority') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD Priority NVARCHAR(20) NULL;
+GO
+
+IF COL_LENGTH('monitor.Recommendations', 'Acknowledged') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD Acknowledged BIT NULL DEFAULT 0;
+GO
+
+IF COL_LENGTH('monitor.Recommendations', 'AcknowledgedBy') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD AcknowledgedBy NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.Recommendations', 'AcknowledgedAt') IS NULL
+    ALTER TABLE [monitor].[Recommendations] ADD AcknowledgedAt DATETIME2 NULL;
+GO
+
 IF OBJECT_ID('monitor.Incidents', 'U') IS NULL
 CREATE TABLE [monitor].[Incidents] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -421,9 +993,41 @@ CREATE TABLE [monitor].[Incidents] (
     INDEX IX_Incidents_Type NONCLUSTERED (IncidentType, DetectedAt),
     INDEX IX_Incidents_Severity NONCLUSTERED (Severity, DetectedAt)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.Incidents', 'IncidentId') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD IncidentId UNIQUEIDENTIFIER DEFAULT NEWID();
 GO
 
--- Uptime tracking periods
+IF COL_LENGTH('monitor.Incidents', 'DetectedAt') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD DetectedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'ResolvedAt') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD ResolvedAt DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'IncidentType') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD IncidentType NVARCHAR(50) NULL;
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'Description') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD Description NVARCHAR(MAX) NULL;
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'Impact') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD Impact NVARCHAR(500) NULL;
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'CreatedBy') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD CreatedBy NVARCHAR(128) NULL;
+GO
+
+IF COL_LENGTH('monitor.Incidents', 'UpdatedBy') IS NULL
+    ALTER TABLE [monitor].[Incidents] ADD UpdatedBy NVARCHAR(128) NULL;
+GO
+
 IF OBJECT_ID('monitor.UptimePeriods', 'U') IS NULL
 CREATE TABLE [monitor].[UptimePeriods] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -440,9 +1044,49 @@ CREATE TABLE [monitor].[UptimePeriods] (
     INDEX IX_UptimePeriods_Date NONCLUSTERED (PeriodStart),
     INDEX IX_UptimePeriods_Type NONCLUSTERED (PeriodType, PeriodStart)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.UptimePeriods', 'PeriodStart') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD PeriodStart DATETIME2 NULL;
 GO
 
--- SLA tracking
+IF COL_LENGTH('monitor.UptimePeriods', 'PeriodEnd') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD PeriodEnd DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'TotalMinutes') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD TotalMinutes INT NULL;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'UptimeMinutes') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD UptimeMinutes INT NULL;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'DowntimeMinutes') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD DowntimeMinutes INT NULL;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'UptimePercentage') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD UptimePercentage DECIMAL(5,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'IncidentCount') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD IncidentCount INT NULL DEFAULT 0;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'CriticalIncidents') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD CriticalIncidents INT NULL DEFAULT 0;
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'CreatedAt') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD CreatedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
+GO
+
+IF COL_LENGTH('monitor.UptimePeriods', 'PeriodType') IS NULL
+    ALTER TABLE [monitor].[UptimePeriods] ADD PeriodType NVARCHAR(20) NULL;
+GO
+
 IF OBJECT_ID('monitor.SLATracking', 'U') IS NULL
 CREATE TABLE [monitor].[SLATracking] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -459,9 +1103,45 @@ CREATE TABLE [monitor].[SLATracking] (
     INDEX IX_SLATracking_Date NONCLUSTERED (PeriodStart),
     INDEX IX_SLATracking_Type NONCLUSTERED (PeriodType, PeriodStart)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.SLATracking', 'PeriodStart') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD PeriodStart DATETIME2 NULL;
 GO
 
--- Incident sources tracking
+IF COL_LENGTH('monitor.SLATracking', 'PeriodEnd') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD PeriodEnd DATETIME2 NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'TargetUptime') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD TargetUptime DECIMAL(5,2) NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'SLAMet') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD SLAMet BIT NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'ViolationCount') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD ViolationCount INT NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'CriticalViolations') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD CriticalViolations INT NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'PenaltyMinutes') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD PenaltyMinutes INT NULL;
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'CreatedAt') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD CreatedAt DATETIME2 NULL DEFAULT SYSUTCDATETIME();
+GO
+
+IF COL_LENGTH('monitor.SLATracking', 'PeriodType') IS NULL
+    ALTER TABLE [monitor].[SLATracking] ADD PeriodType NVARCHAR(20) NULL;
+GO
+
 IF OBJECT_ID('monitor.IncidentSources', 'U') IS NULL
 CREATE TABLE [monitor].[IncidentSources] (
     Id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -473,8 +1153,18 @@ CREATE TABLE [monitor].[IncidentSources] (
     CreatedAt       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
     FOREIGN KEY (IncidentId) REFERENCES [monitor].[Incidents](IncidentId)
 );
+-- Column reconciliation: an installation that predates any of
+-- these columns still has the table, so the CREATE above is skipped
+-- whole and its shape would never change.
+IF COL_LENGTH('monitor.IncidentSources', 'IncidentId') IS NULL
+    ALTER TABLE [monitor].[IncidentSources] ADD IncidentId UNIQUEIDENTIFIER NULL;
 GO
 
-PRINT '✓ Schema [monitor] created successfully.';
-PRINT '✓ All monitoring tables created.';
+IF COL_LENGTH('monitor.IncidentSources', 'SourceType') IS NULL
+    ALTER TABLE [monitor].[IncidentSources] ADD SourceType NVARCHAR(50) NULL;
 GO
+
+IF COL_LENGTH('monitor.IncidentSources', 'DetectionMethod') IS NULL
+    ALTER TABLE [monitor].[IncidentSources] ADD DetectionMethod NVARCHAR(100) NULL;
+GO
+
