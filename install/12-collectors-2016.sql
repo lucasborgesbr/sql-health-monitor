@@ -21,5 +21,5 @@ BEGIN
 END
 GO
 
-:r ..\collectors\collect_query_store.sql
+:r collectors\collect_query_store.sql
 GO

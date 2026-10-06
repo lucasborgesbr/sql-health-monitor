@@ -30,7 +30,7 @@ IF OBJECT_ID(N'monitor.usp_HealthCheck', 'P') IS NOT NULL
     DROP PROCEDURE [monitor].[usp_HealthCheck];
 GO
 
-:r ..\diagnostics\usp_HealthCheck.sql
+:r diagnostics\usp_HealthCheck.sql
 GO
 
 PRINT '+ Procedure [monitor].[usp_HealthCheck] installed.';

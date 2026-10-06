@@ -39,8 +39,12 @@ DECLARE @Level    VARCHAR(20) =
 
 IF @Major < 11
 BEGIN
-    RAISERROR('SQL Health Monitor requires SQL Server 2012 or later. Detected %s.', 16, 1, @Level);
-    RETURN 1;
+    RAISERROR('SQL Health Monitor requires SQL Server 2012 or later. Detected %s.', 16, 1, @Level) WITH NOWAIT;
+    -- RETURN 1 from a script invoked via sqlcmd is illegal ("A RETURN
+    -- statement with a return value cannot be used in this context").
+    -- RAISERROR severity 16 is enough to make sqlcmd's -b flag abort the
+    -- install, which is what we want here.
+    RETURN;
 END
 
 PRINT '+ SQL Health Monitor compatibility check passed (' + @Level + ').';

@@ -24,13 +24,13 @@ GO
 ----------------------------------------------------------------------
 -- CAPTURE BASELINE PROCEDURE
 ----------------------------------------------------------------------
-:r ..\baselines\capture_baseline.sql
+:r baselines\capture_baseline.sql
 GO
 
 ----------------------------------------------------------------------
 -- DETECT ANOMALIES PROCEDURE
 ----------------------------------------------------------------------
-:r ..\baselines\detect_anomalies.sql
+:r baselines\detect_anomalies.sql
 GO
 
 PRINT '  → [monitor].[usp_Baseline_Capture] - Weekly baseline capture';
