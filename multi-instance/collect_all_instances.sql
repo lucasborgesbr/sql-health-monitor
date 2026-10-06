@@ -155,7 +155,7 @@ BEGIN
                     100 
                         - CASE WHEN cpu.CpuMax >= 95 THEN 25 WHEN cpu.CpuMax >= 80 THEN 10 ELSE 0 END
                         - CASE WHEN mem.PleMin <= 100 THEN 25 WHEN mem.PleMin <= 300 THEN 10 ELSE 0 END
-                        - CASE WHEN dsk.DiskMax >= 95 THEN 20 WHEN dsk.DiskMax >= 85 THEN 8 ELSE 0 END
+                        - CASE WHEN dsk.DiskMax >= 90 THEN 20 WHEN dsk.DiskMax >= 80 THEN 8 ELSE 0 END
                         - CASE WHEN ag.AgLag >= 120 THEN 20 WHEN ag.AgLag >= 30 THEN 8 ELSE 0 END
                     AS HealthScore,
                     cpu.CpuAvg, cpu.CpuMax,
@@ -165,8 +165,8 @@ BEGIN
                     ISNULL(blk.BlockCount, 0) AS BlockingCount,
                     ISNULL(alt.AlertCount, 0) AS AlertCount,
                     CASE 
-                        WHEN cpu.CpuMax >= 95 OR mem.PleMin <= 100 OR dsk.DiskMax >= 95 OR ag.AgLag >= 120 THEN ''critical''
-                        WHEN cpu.CpuMax >= 80 OR mem.PleMin <= 300 OR dsk.DiskMax >= 85 OR ag.AgLag >= 30 THEN ''warning''
+                        WHEN cpu.CpuMax >= 95 OR mem.PleMin <= 100 OR dsk.DiskMax >= 90 OR ag.AgLag >= 120 THEN ''critical''
+                        WHEN cpu.CpuMax >= 80 OR mem.PleMin <= 300 OR dsk.DiskMax >= 80 OR ag.AgLag >= 30 THEN ''warning''
                         ELSE ''healthy''
                     END AS OverallStatus
                 FROM (
@@ -331,7 +331,7 @@ GO
                     100 
                         - CASE WHEN cpu.CpuMax >= 95 THEN 25 WHEN cpu.CpuMax >= 80 THEN 10 ELSE 0 END
                         - CASE WHEN mem.PleMin <= 100 THEN 25 WHEN mem.PleMin <= 300 THEN 10 ELSE 0 END
-                        - CASE WHEN dsk.DiskMax >= 95 THEN 20 WHEN dsk.DiskMax >= 85 THEN 8 ELSE 0 END
+                        - CASE WHEN dsk.DiskMax >= 90 THEN 20 WHEN dsk.DiskMax >= 80 THEN 8 ELSE 0 END
                         - CASE WHEN ag.AgLag >= 120 THEN 20 WHEN ag.AgLag >= 30 THEN 8 ELSE 0 END
                     AS HealthScore,
                     cpu.CpuAvg, cpu.CpuMax,
@@ -341,8 +341,8 @@ GO
                     ISNULL(blk.BlockCount, 0) AS BlockingCount,
                     ISNULL(alt.AlertCount, 0) AS AlertCount,
                     CASE 
-                        WHEN cpu.CpuMax >= 95 OR mem.PleMin <= 100 OR dsk.DiskMax >= 95 OR ag.AgLag >= 120 THEN ''critical''
-                        WHEN cpu.CpuMax >= 80 OR mem.PleMin <= 300 OR dsk.DiskMax >= 85 OR ag.AgLag >= 30 THEN ''warning''
+                        WHEN cpu.CpuMax >= 95 OR mem.PleMin <= 100 OR dsk.DiskMax >= 90 OR ag.AgLag >= 120 THEN ''critical''
+                        WHEN cpu.CpuMax >= 80 OR mem.PleMin <= 300 OR dsk.DiskMax >= 80 OR ag.AgLag >= 30 THEN ''warning''
                         ELSE ''healthy''
                     END AS OverallStatus
                 FROM (

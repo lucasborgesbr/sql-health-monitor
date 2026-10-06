@@ -299,15 +299,15 @@ BEGIN
     INSERT #WeeklyTopWaits
     SELECT ISNULL(tw.WaitType,lw.WaitType), ISNULL(tw.TotalDeltaMs,0), ISNULL(lw.TotalDeltaMs,0)
     FROM (
-        SELECT TOP 10 WaitType, SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) AS TotalDeltaMs
-        FROM [monitor].[WaitStatsHistory] WHERE CollectedAt >= @ThisWeekStart
-        GROUP BY WaitType ORDER BY SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) DESC
+        SELECT TOP 10 WaitType, SUM(DeltaWaitTimeMs) AS TotalDeltaMs
+        FROM [monitor].[WaitStatsHistory] WHERE CollectedAt >= @ThisWeekStart AND DeltaWaitTimeMs IS NOT NULL
+        GROUP BY WaitType ORDER BY SUM(DeltaWaitTimeMs) DESC
     ) tw
     FULL OUTER JOIN (
-        SELECT TOP 10 WaitType, SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) AS TotalDeltaMs
+        SELECT TOP 10 WaitType, SUM(DeltaWaitTimeMs) AS TotalDeltaMs
         FROM [monitor].[WaitStatsHistory]
-        WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd
-        GROUP BY WaitType ORDER BY SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) DESC
+        WHERE CollectedAt >= @LastWeekStart AND CollectedAt < @LastWeekEnd AND DeltaWaitTimeMs IS NOT NULL
+        GROUP BY WaitType ORDER BY SUM(DeltaWaitTimeMs) DESC
     ) lw ON tw.WaitType = lw.WaitType;
 
     -- Index Recommendations (from DMVs)

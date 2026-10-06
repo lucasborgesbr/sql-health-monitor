@@ -102,6 +102,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `-SqlAuth -Login sa -Password ...` to force SQL auth even when
   `SQLCMDUSER` happens to be set.
 
+## [1.1.4] - 2026-10-06
+
+### Fixed
+- `collect_waits` stored `DeltaWaitTimeMs` as NULL, so the daily and weekly
+  reports summed cumulative counters and ranked idle waits first. It now stores
+  the delta against the previous snapshot (counter resets use the current
+  value) and skips more idle waits (`LAZYWRITER_SLEEP`,
+  `DISPATCHER_QUEUE_SEMAPHORE`, `QDS_*`, `HADR_*` ...)
+- Daily and weekly top-waits use deltas only
+
+### Changed
+- Disk thresholds are 80% warning / 90% critical everywhere (daily report,
+  recommendations, multi-instance scoring, `Disk_UsedPct` default, READMEs)
+
+### Migration
+- `V1_1_4__waits-delta-backfill-and-disk-thresholds.sql` backfills the missing
+  deltas and moves `Disk_UsedPct` to 80/90 only if it is still 85/95
+
 ## [1.0.0] - 2026-06-02
 
 ### Added
