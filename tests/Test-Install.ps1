@@ -191,8 +191,21 @@ function Invoke-Install {
     if ($SqlAuth)    { $psArgs += @('-SqlAuth', '-Login', $Login, '-Password', $Password) }
     $psArgs += $ExtraArgs
 
-    $out = & powershell @psArgs 2>&1
-    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($out | Out-String) }
+    # Several scenarios assert that Install.ps1 *refuses* something, and it
+    # reports refusals with Write-Error -- which goes to stderr. Under
+    # $ErrorActionPreference = 'Stop' a native command's stderr would abort
+    # this script before the assertion could run, so relax it for the call and
+    # judge the outcome by the exit code instead.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out  = & powershell @psArgs 2>&1 | ForEach-Object { $_.ToString() }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+
+    return [pscustomobject]@{ ExitCode = $code; Output = ($out -join "`n") }
 }
 
 # ---- runner -------------------------------------------------------------------
@@ -282,9 +295,92 @@ FROM [$Database].[monitor].[SchemaVersion] WHERE Version = '1.1.0';
         Assert-Equal -Expected '1.1.0' -Actual $p[0] -Message 'PreviousVersion records where the upgrade came from'
     }
 
-    # Scenarios for -Mode, upgrades, migrations and job schedules are added by
-    # the tasks that implement them. A scenario that cannot pass yet is worse
-    # than no scenario: it trains you to ignore red.
+    Invoke-Scenario 'Upgrade records the repo version' {
+        Reset-TestDatabase
+        $f = Invoke-Install @('-Mode', 'Fresh', '-Force')
+        Assert-Equal -Expected 0 -Actual $f.ExitCode -Message "Fresh install succeeds. Output:`n$($f.Output)"
+
+        $v = Invoke-Sql -Db $Database -Query "SELECT [$Database].[monitor].[fn_GetInstalledVersion]();"
+        Assert-Equal -Expected $repoVersion -Actual $v[0] -Message 'installed version matches the VERSION file'
+
+        $mode = Invoke-Sql -Db $Database -Query "SELECT TOP 1 InstallMode FROM [$Database].[monitor].[SchemaVersion];"
+        Assert-Equal -Expected 'Fresh' -Actual $mode[0] -Message 'recorded as a Fresh install'
+    }
+
+    Invoke-Scenario 'Upgrade preserves operator configuration' {
+        Invoke-Sql -Db $Database -Query @"
+UPDATE [$Database].[monitor].[Settings] SET SettingValue = 'sentinel@corp.example'
+WHERE Category = 'Email' AND SettingName = 'Recipients';
+UPDATE [$Database].[monitor].[Settings] SET SettingValue = 'ptbr'
+WHERE Category = 'General' AND SettingName = 'Language';
+UPDATE [$Database].[monitor].[Thresholds] SET WarningValue = 42
+WHERE MetricName = 'CPU_SqlPct';
+"@ | Out-Null
+
+        $u = Invoke-Install @('-Mode', 'Upgrade')
+        Assert-Equal -Expected 0 -Actual $u.ExitCode -Message "Upgrade succeeds. Output:`n$($u.Output)"
+
+        $r = Invoke-Sql -Db $Database -Query "SELECT SettingValue FROM [$Database].[monitor].[Settings] WHERE Category='Email' AND SettingName='Recipients';"
+        Assert-Equal -Expected 'sentinel@corp.example' -Actual $r[0] -Message 'Email.Recipients survived the upgrade'
+
+        $l = Invoke-Sql -Db $Database -Query "SELECT SettingValue FROM [$Database].[monitor].[Settings] WHERE Category='General' AND SettingName='Language';"
+        Assert-Equal -Expected 'ptbr' -Actual $l[0] -Message 'General.Language survived the upgrade'
+
+        $t = Invoke-Sql -Db $Database -Query "SELECT WarningValue FROM [$Database].[monitor].[Thresholds] WHERE MetricName='CPU_SqlPct';"
+        Assert-Equal -Expected '42.00' -Actual $t[0] -Message 'tuned threshold survived the upgrade'
+    }
+
+    Invoke-Scenario 'Upgrade inserts missing defaults but leaves present ones alone' {
+        Invoke-Sql -Db $Database -Query "DELETE FROM [$Database].[monitor].[Settings] WHERE Category='General' AND SettingName='ServerName';" | Out-Null
+
+        $u = Invoke-Install @('-Mode', 'Upgrade')
+        Assert-Equal -Expected 0 -Actual $u.ExitCode -Message "Upgrade succeeds. Output:`n$($u.Output)"
+
+        $s = Invoke-Sql -Db $Database -Query "SELECT CAST(COUNT(*) AS VARCHAR(10)) FROM [$Database].[monitor].[Settings] WHERE Category='General' AND SettingName='ServerName';"
+        Assert-Equal -Expected '1' -Actual $s[0] -Message 'a missing default is re-inserted'
+
+        # Languages are repo-owned: a stale translation must be corrected.
+        Invoke-Sql -Db $Database -Query @"
+UPDATE [$Database].[monitor].[Languages] SET StringValue = 'stale text'
+WHERE LanguageCode='en' AND StringKey='report.daily.title';
+"@ | Out-Null
+        $null = Invoke-Install @('-Mode', 'Upgrade')
+
+        $g = Invoke-Sql -Db $Database -Query "SELECT StringValue FROM [$Database].[monitor].[Languages] WHERE LanguageCode='en' AND StringKey='report.daily.title';"
+        Assert-Equal -Expected 'Daily SQL Health Report' -Actual $g[0] -Message 'stale translation corrected on upgrade'
+    }
+
+    Invoke-Scenario 'Upgrade refuses a downgrade unless -Force is given' {
+        Invoke-Sql -Db $Database -Query "DELETE FROM [$Database].[monitor].[SchemaVersion];" | Out-Null
+        Invoke-Sql -Db $Database -File 'install\99-record-version.sql' `
+                   -Vars @('Version=99.0.0', 'Mode=Fresh', 'Commit=x') | Out-Null
+
+        $d = Invoke-Install @('-Mode', 'Upgrade')
+        Assert-Equal -Expected 1 -Actual $d.ExitCode -Message 'downgrade refused, exit 1'
+        Assert-True -Condition ($d.Output -match '99\.0\.0') -Message 'refusal names the installed version'
+
+        $v = Invoke-Sql -Db $Database -Query "SELECT [$Database].[monitor].[fn_GetInstalledVersion]();"
+        Assert-Equal -Expected '99.0.0' -Actual $v[0] -Message 'installed version untouched by the refusal'
+    }
+
+    Invoke-Scenario 'Upgrade refuses to run against a database that does not exist' {
+        Reset-TestDatabase
+        $u = Invoke-Install @('-Mode', 'Upgrade')
+        Assert-Equal -Expected 1 -Actual $u.ExitCode -Message 'no silent fallback to Fresh'
+        Assert-True -Condition ($u.Output -match 'Fresh') -Message 'points the operator at -Mode Fresh'
+    }
+
+    Invoke-Scenario 'Fresh requires -Force' {
+        Reset-TestDatabase
+        $null = Invoke-Install @('-Mode', 'Fresh', '-Force')
+        $f = Invoke-Install @('-Mode', 'Fresh')
+        Assert-Equal -Expected 1 -Actual $f.ExitCode -Message 'Fresh without -Force is refused'
+        Assert-True -Condition ($f.Output -match 'Force') -Message 'the message names -Force'
+    }
+
+    # Scenarios for migrations and job schedules are added by the tasks that
+    # implement them. A scenario that cannot pass yet is worse than no
+    # scenario: it trains you to ignore red.
 }
 finally {
     Write-Host ""
