@@ -345,7 +345,7 @@ SELECT j.name, j.enabled
 FROM msdb.dbo.sysjobs j
 WHERE j.name LIKE N'SQL Health Monitor%'
 ORDER BY j.name;
-"@)
+"@
             if ($jobs.Count -eq 0) { Write-Host "    (none)" }
             foreach ($j in $jobs) { Write-Host "    $j" }
         } catch {
