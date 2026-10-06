@@ -456,6 +456,15 @@ finally {
     if ($script:Fail -gt 0) {
         Write-Host ""
         foreach ($f in $script:Failures) { Write-Host "  - $f" -ForegroundColor Red }
-        exit 1
     }
+
+    # Every scenario DROPs the database, and the last one leaves it holding only
+    # what 00 and 08 create. Say so plainly rather than letting whoever ran this
+    # find a half-installed database later.
+    Write-Host ""
+    Write-Host "The '$Database' database was dropped and rebuilt by these scenarios and" -ForegroundColor Yellow
+    Write-Host "is NOT in a usable state. To restore a working install:" -ForegroundColor Yellow
+    Write-Host "  .\deploy\Install.ps1 -Mode Fresh -Force" -ForegroundColor Yellow
+
+    if ($script:Fail -gt 0) { exit 1 }
 }

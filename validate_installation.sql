@@ -127,18 +127,27 @@ INSERT INTO @CollectorProcs VALUES
 ('usp_Collect_DatabaseGrowth'), ('usp_Collect_ErrorLog'), ('usp_Collect_LogGrowth'),
 ('usp_Collect_Deadlocks');
 
+-- COUNT(*) over a LEFT JOIN counts every row whether it matched or not, so it
+-- reports every expected procedure as missing. Count the unmatched ones.
 DECLARE @MissingProcs INT;
-SELECT @MissingProcs = COUNT(*) 
+SELECT @MissingProcs = COUNT(*)
 FROM @CollectorProcs cp
-LEFT JOIN sys.procedures p ON cp.ProcName = p.name AND SCHEMA_NAME(p.schema_id) = 'monitor';
+LEFT JOIN sys.procedures p ON cp.ProcName = p.name AND SCHEMA_NAME(p.schema_id) = 'monitor'
+WHERE p.object_id IS NULL;
 
 IF @MissingProcs = 0
 BEGIN
-    PRINT '✓ All 16 collector procedures implemented';
+    -- A subquery is not allowed inside the PRINT concatenation.
+    DECLARE @ExpectedProcs INT = (SELECT COUNT(*) FROM @CollectorProcs);
+    PRINT '✓ All ' + CAST(@ExpectedProcs AS VARCHAR(10)) + ' collector procedures implemented';
 END
 ELSE
 BEGIN
-    PRINT '✗ Missing ' + CAST(@MissingProcs AS VARCHAR(10)) + ' collector procedures';
+    PRINT '✗ Missing ' + CAST(@MissingProcs AS VARCHAR(10)) + ' collector procedures:';
+    SELECT cp.ProcName AS MissingProcedure
+    FROM @CollectorProcs cp
+    LEFT JOIN sys.procedures p ON cp.ProcName = p.name AND SCHEMA_NAME(p.schema_id) = 'monitor'
+    WHERE p.object_id IS NULL;
 END
 PRINT '';
 
