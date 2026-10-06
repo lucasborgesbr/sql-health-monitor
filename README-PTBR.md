@@ -25,12 +25,25 @@ O PowerShell é usado **apenas** para deploy (`deploy/Install.ps1` executa os ar
 
 | Componente | Requisito |
 |------------|-----------|
-| SQL Server | 2012+ (otimizado para 2022) |
+| SQL Server | 2012+ (otimizado para 2022). Veja a matriz de compatibilidade abaixo. |
 | SQL Server Agent | Obrigatório para os jobs agendados |
 | Database Mail | Obrigatório para envio de relatórios e alertas |
 | Permissões | `sysadmin` recomendado; `db_owner` mínimo |
 
 > **PowerShell** (5.1+) e **sqlcmd** são necessários apenas durante o deploy. Nenhum módulo PowerShell (`dbatools`, `SqlServer`) é exigido.
+
+### Compatibilidade por versão
+
+O `install\00-compat-checks.sql` aborta a instalação se a versão for menor que 2012. Acima disso, alguns recursos são pulados dependendo do que o SQL Server expõe:
+
+| Recurso | Por que pula | 2012-2014 | 2016+ | 2017+ |
+|---------|-------------|:---------:|:-----:|:-----:|
+| Coletores principais, alertas, relatórios, baseline tables | nenhuma feature 2016+ | sim | sim | sim |
+| `usp_HealthCheck` (diagnostics\usp_HealthCheck.sql) | usa `sys.dm_db_stats_properties` | não | sim | sim |
+| `usp_Collect_QueryStore` (collectors\collect_query_store.sql) | usa `sys.query_store_*` | não | sim | sim |
+| `usp_Baseline_Capture` / `usp_Baseline_DetectAnomalies` | usa `STRING_AGG` e `PERCENTILE_CONT` | não | não | sim |
+
+Em 2012-2014 o instalador imprime um aviso em cada script pulado e segue em frente.
 
 ## Instalação
 
@@ -239,6 +252,7 @@ sql-health-monitor/
 │   └── Uninstall.ps1                # Remove jobs e dropa o banco
 │
 ├── install/                         # Scripts T-SQL de instalação (execução em ordem)
+│   ├── 00-compat-checks.sql          # Piso de compatibilidade (>= 2012)
 │   ├── 00-create-schema.sql         # Banco, schema, tabelas, índices
 │   ├── 01-create-collectors.sql     # Procedure master de coleta
 │   ├── 02-create-reports.sql        # Runner de relatórios (usp_RunReport)
@@ -246,9 +260,14 @@ sql-health-monitor/
 │   ├── 04-create-jobs.sql           # SQL Agent Jobs (6 jobs)
 │   ├── 05-configure.sql             # Configurações e thresholds padrão
 │   ├── 06-alert-history.sql         # Histórico de alertas + cooldown
-│   ├── 07-baselines.sql             # Engine de baseline
+│   ├── 07-baselines.sql             # Tabelas e config de baseline (2012+)
 │   ├── 08-extended-schema.sql       # Schema estendido de monitoramento
 │   ├── 09-uptime-tracker.sql        # Rastreamento SLA de uptime
+│   ├── 10-phase1-3-schema.sql       # Tabelas adicionais de coleta
+│   ├── 11-health-check-2016.sql     # usp_HealthCheck (2016+: usa dm_db_stats_properties)
+│   ├── 12-collectors-2016.sql       # collect_query_store (2016+: usa sys.query_store_*)
+│   ├── 13-baselines-2017.sql        # usp_Baseline_Capture/Detect (2017+: usa STRING_AGG)
+│   ├── 99-record-version.sql        # Grava a versão aplicada por último
 │   └── Uninstall.sql                # Remove jobs + dropa o banco
 │
 ├── collectors/                      # 18 procedures T-SQL de coleta

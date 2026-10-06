@@ -26,7 +26,7 @@
     Compatibility: SQL Server 2016+. Tested on 2022.
 */
 
-CREATE OR ALTER PROCEDURE [monitor].[usp_HealthCheck]
+CREATE PROCEDURE [monitor].[usp_HealthCheck]
     @CheckId      INT = NULL,
     @OutputType   VARCHAR(20) = 'TABLE',
     @DatabaseName NVARCHAR(128) = NULL

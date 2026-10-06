@@ -238,6 +238,7 @@ function Get-PendingMigrations {
 $JobScript = 'install\04-create-jobs.sql'
 
 $scripts = @(
+    "install\00-compat-checks.sql",
     "install\00-create-schema.sql",
     "install\01-create-collectors.sql",
     "install\02-create-reports.sql",
@@ -267,7 +268,6 @@ $scripts = @(
     "collectors\collect_errorlog.sql",
     "collectors\collect_uptime_tracker.sql",
     "collectors\collect_live_sessions.sql",
-    "collectors\collect_query_store.sql",
     "collectors\collect_index_recommendations.sql",
     "reports\html_builder_daily.sql",
     "reports\html_builder_weekly.sql",
@@ -276,13 +276,13 @@ $scripts = @(
     "reports\recommendations_engine.sql",
     "alerts\alert_engine.sql",
     "alerts\alert_actions.sql",
-    "baselines\capture_baseline.sql",
-    "baselines\detect_anomalies.sql",
     "maintenance\purge_old_data.sql",
     "maintenance\update_baselines.sql",
     "views\vw_CurrentHealth.sql",
     "views\vw_UptimeTracker.sql",
-    "install\11-health-check.sql",
+    "install\11-health-check-2016.sql",
+    "install\12-collectors-2016.sql",
+    "install\13-baselines-2017.sql",
     "install\99-record-version.sql"
 )
 
@@ -471,7 +471,10 @@ try {
         Write-Host "  [$current/$total] $rel" -NoNewline
 
         # 00-create-schema.sql creates the database, so it must run against master.
-        $dbArg = if ($rel -eq 'install\00-create-schema.sql') { 'master' } else { $Database }
+        # 00-compat-checks.sql runs against master too: it aborts the install early
+        # if the SQL Server is below 2012, and doing that against the database we
+        # are about to create would race with creation itself.
+        $dbArg = if ($rel -eq 'install\00-create-schema.sql' -or $rel -eq 'install\00-compat-checks.sql') { 'master' } else { $Database }
 
         $args = @($BaseArgs) + @('-d', $dbArg)
         foreach ($v in @(

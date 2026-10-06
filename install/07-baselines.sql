@@ -102,18 +102,17 @@ END;
 GO
 
 ----------------------------------------------------------------------
--- CAPTURE BASELINE PROCEDURE
+-- CAPTURE BASELINE / DETECT ANOMALIES PROCEDURES
+-- SQL Server 2017+ only: capture_baseline.sql uses STRING_AGG (2017+)
+-- and PERCENTILE_CONT (2016+). On older builds, the baseline table and
+-- configuration are still created, but the procedures are skipped.
+-- The guard lives in install/13-baselines-2017.sql because :r is
+-- processed at parse time and cannot be made conditional by an IF.
 ----------------------------------------------------------------------
-:r baselines\capture_baseline.sql
+PRINT '  → Baseline procedures installed in 13-baselines-2017.sql (2017+).';
 GO
 
-----------------------------------------------------------------------
--- DETECT ANOMALIES PROCEDURE
-----------------------------------------------------------------------
-:r baselines\detect_anomalies.sql
-GO
-
-PRINT '✓ Baseline Engine installation complete.';
+PRINT '✓ Baseline Engine (tables) installation complete.';
 PRINT '  → [monitor].[BaselineCapture] - Stores periodic baselines';
 PRINT '  → [monitor].[BaselineConfig] - Per-metric anomaly thresholds';
 PRINT '  → [monitor].[BaselineAnomalies] - Detected anomalies log';

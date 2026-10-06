@@ -17,9 +17,9 @@
     Per-script skips live where they belong (so a future maintainer who
     edits baselines/capture_baseline.sql will not look here for the guard
     that wraps it):
-      install/07-baselines.sql         skips procedures on <2017
-      install/11-health-check.sql      skips whole file on <2016
-      install/12-collectors-2016.sql   skips whole file on <2016
+      install/11-health-check-2016.sql  skips whole file on <2016
+      install/12-collectors-2016.sql    skips whole file on <2016
+      install/13-baselines-2017.sql     skips whole file on <2017
 */
 
 SET NOCOUNT ON;
