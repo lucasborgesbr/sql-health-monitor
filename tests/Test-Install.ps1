@@ -445,6 +445,20 @@ WHERE object_id = OBJECT_ID('monitor.BackupHistory') AND name = 'HoursSinceLastB
         Assert-True -Condition (-not [string]::IsNullOrEmpty($c[0])) -Message 'extended-schema column restored'
     }
 
+    Invoke-Scenario '00-compat-checks runs first and announces the version' {
+        Reset-TestDatabase -SkipJobs:$SkipJobs
+
+        # 00-compat-checks.sql is a stand-alone script. It runs against master
+        # in the install chain, but here we invoke it explicitly.
+        $out = Invoke-Sql -Db 'master' -File 'install\00-compat-checks.sql'
+        $joined = ($out -join ' ').ToLower()
+
+        Assert-True -Condition ($joined -match 'compatibility check passed') `
+                     -Message '00-compat-checks prints the success message'
+        Assert-True -Condition ($joined -match 'sql server') `
+                     -Message '00-compat-checks names the SQL Server version'
+    }
+
     Invoke-Scenario 'usp_HealthCheck is deployed by the install chain' {
         Reset-TestDatabase -SkipJobs:$SkipJobs
         Invoke-Sql -File 'install\00-create-schema.sql' | Out-Null
