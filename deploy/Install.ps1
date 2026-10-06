@@ -56,8 +56,11 @@
     supplied, row counts are still reported so a lost row is visible.
 
 .PARAMETER SqlAuth
-    Use SQL authentication explicitly. Without it, credentials are read from
-    the SQLCMDUSER / SQLCMDPASSWORD environment variables when present.
+    Use SQL authentication explicitly. Without it, credentials are read
+    from the SQLCMDUSER / SQLCMDPASSWORD environment variables when present;
+    if they are not, Windows authentication is used (the current Windows
+    user, via sqlcmd's -E). Pass -SqlAuth only when you want to force SQL
+    auth even though the env vars happen to be set.
 
 .EXAMPLE
     .\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Status
@@ -65,6 +68,9 @@
     .\Install.ps1 -ServerInstance "SQLSERVER01"
 .EXAMPLE
     .\Install.ps1 -ServerInstance "SQLSERVER01" -Mode Fresh -Force
+.EXAMPLE
+    # SQL auth, overriding any SQLCMDUSER set in the environment
+    .\Install.ps1 -ServerInstance "SQLSERVER01" -SqlAuth -Login "sa" -Password "..."
 #>
 [CmdletBinding()]
 param(
@@ -103,22 +109,18 @@ if ($SqlAuth) {
     $env:SQLCMDUSER     = $Login
     $env:SQLCMDPASSWORD = $Password
 } elseif (-not $env:SQLCMDUSER) {
-    Write-Error @"
-No SQL credentials available.
-
-Set them once for the machine:
-  setx SQLCMDSERVER   "localhost,1433"
-  setx SQLCMDUSER     "sa"
-  setx SQLCMDPASSWORD "<password>"
-
-or pass -SqlAuth -Login <user> -Password <password>.
-"@
-    exit 1
+    # No SQL credentials in the environment. Fall through to Windows auth
+    # rather than refusing to run: the current Windows user is passed to
+    # sqlcmd via -E below. A failure to connect now is sqlcmd's problem
+    # to report, not ours.
+    $env:SQLCMDSERVER = $ServerInstance
 }
 
-# No -E when SQLCMDUSER is set: it overrides the environment variables and
-# fails on any SQL-auth instance. -C is mandatory on sqlcmd 18.
+# -E (Windows auth) is passed when there are no SQL credentials in the
+# environment. Passing it alongside SQLCMDUSER would override the env vars
+# and silently fail on a SQL-auth instance.
 $BaseArgs = @('-S', $ServerInstance, '-b', '-V', '1', '-C')
+if (-not $env:SQLCMDUSER) { $BaseArgs += '-E' }
 
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 

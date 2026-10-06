@@ -90,6 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `diagnostics/usp_HealthCheck.sql` uses `CREATE PROCEDURE`; idempotency
   is owned by `install/11-health-check-2016.sql`.
 
+## [1.1.3] - 2026-10-06
+
+### Changed
+- `Install.ps1` and `Test-Install.ps1` fall back to Windows authentication
+  (`-E` to sqlcmd) when neither `-SqlAuth` nor the `SQLCMDUSER` env var
+  is set. The previous "No SQL credentials available" exit is gone --
+  the operator with only domain credentials now reaches the same point
+  that an SQL-auth user would, and gets a sqlcmd login error if the
+  Windows account does not have access to the target instance. Pass
+  `-SqlAuth -Login sa -Password ...` to force SQL auth even when
+  `SQLCMDUSER` happens to be set.
+
 ## [1.0.0] - 2026-06-02
 
 ### Added
