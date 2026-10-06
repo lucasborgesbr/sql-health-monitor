@@ -64,12 +64,12 @@ BEGIN
     SELECT 
         'Disk Space', 
         dh.UsedPct,
-        CASE WHEN dh.UsedPct > 95 THEN 'CRITICAL: Critical disk space usage. Immediate action required to prevent database failure.'
-             WHEN dh.UsedPct > 85 THEN 'WARNING: High disk space usage. Consider cleanup or expansion.'
+        CASE WHEN dh.UsedPct > 90 THEN 'CRITICAL: Critical disk space usage. Immediate action required to prevent database failure.'
+             WHEN dh.UsedPct > 80 THEN 'WARNING: High disk space usage. Consider cleanup or expansion.'
              ELSE 'INFO: Disk space usage is within normal parameters.'
         END,
-        CASE WHEN dh.UsedPct > 95 THEN 'HIGH'
-             WHEN dh.UsedPct > 85 THEN 'MEDIUM'
+        CASE WHEN dh.UsedPct > 90 THEN 'HIGH'
+             WHEN dh.UsedPct > 80 THEN 'MEDIUM'
              ELSE 'LOW'
         END,
         @RecommendationDate

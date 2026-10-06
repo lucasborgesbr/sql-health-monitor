@@ -133,7 +133,7 @@ BEGIN
     SET @HtmlBody += '<tr><td>Disk</td>'
         + '<td>' + CAST(ISNULL(CAST(@DiskMaxPct AS INT),0) AS VARCHAR) + '% max used</td>'
         + '<td><span class="badge ' + CASE @DiskStatus WHEN 'critical' THEN 'crit' WHEN 'warning' THEN 'warn' ELSE 'ok' END + '">' + UPPER(@DiskStatus) + '</span></td>'
-        + '<td>' + CASE @DiskStatus WHEN 'critical' THEN 'Above 95% &mdash; immediate action needed' WHEN 'warning' THEN 'Above 85% &mdash; monitor closely' ELSE 'Normal' END + '</td></tr>';
+        + '<td>' + CASE @DiskStatus WHEN 'critical' THEN 'Above 90% &mdash; immediate action needed' WHEN 'warning' THEN 'Above 80% &mdash; monitor closely' ELSE 'Normal' END + '</td></tr>';
 
     -- AG row
     SET @HtmlBody += '<tr><td>AG Sync</td>'

@@ -82,7 +82,7 @@ USING (VALUES
 ('Memory_BufferHitRatio', 95, 90, '<=', 'Buffer cache hit ratio percentage'),
 
 -- Disk
-('Disk_UsedPct', 85, 95, '>=', 'Disk space used percentage'),
+('Disk_UsedPct', 80, 90, '>=', 'Disk space used percentage'),
 ('Disk_ReadLatencyMs', 20, 50, '>=', 'Average read latency (ms)'),
 ('Disk_WriteLatencyMs', 20, 50, '>=', 'Average write latency (ms)'),
 

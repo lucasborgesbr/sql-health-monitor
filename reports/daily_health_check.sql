@@ -80,7 +80,7 @@ BEGIN
 
     SELECT @DiskMaxPct = MAX(UsedPct)
     FROM [monitor].[DiskHistory] WHERE CollectedAt >= @StartDate;
-    SET @DiskStatus = CASE WHEN @DiskMaxPct >= 95 THEN 'critical' WHEN @DiskMaxPct >= 85 THEN 'warning' ELSE 'healthy' END;
+    SET @DiskStatus = CASE WHEN @DiskMaxPct >= 90 THEN 'critical' WHEN @DiskMaxPct >= 80 THEN 'warning' ELSE 'healthy' END;
 
     SELECT @AgMaxLag = MAX(SecondsBehindPrimary)
     FROM [monitor].[AgHealthHistory] WHERE CollectedAt >= @StartDate;
@@ -116,7 +116,7 @@ BEGIN
         ActionItem NVARCHAR(500)
     );
 
-    IF @DiskMaxPct >= 95
+    IF @DiskMaxPct >= 90
         INSERT #ReportRecommendations VALUES (1,'Disk',
             'Disk usage at ' + CAST(CAST(@DiskMaxPct AS INT) AS NVARCHAR) + '%. Immediate action required.',
             'Free disk space, extend volume, or archive old data.');
@@ -132,10 +132,10 @@ BEGIN
         INSERT #ReportRecommendations VALUES (2,'CPU',
             'CPU peaked at ' + CAST(@CpuMax AS NVARCHAR) + '%.',
             'Review top CPU consumers in TopQueriesHistory. Consider query tuning or index optimization.');
-    IF @DiskMaxPct >= 85 AND @DiskMaxPct < 95
+    IF @DiskMaxPct >= 80 AND @DiskMaxPct < 90
         INSERT #ReportRecommendations VALUES (2,'Disk',
             'Disk usage at ' + CAST(CAST(@DiskMaxPct AS INT) AS NVARCHAR) + '%. Plan capacity expansion.',
-            'Project growth rate and schedule disk expansion before reaching 95%.');
+            'Project growth rate and schedule disk expansion before reaching 90%.');
     IF @BlockingCount > 10
         INSERT #ReportRecommendations VALUES (2,'Blocking',
             CAST(@BlockingCount AS NVARCHAR) + ' blocking events in 24h.',
@@ -168,13 +168,17 @@ BEGIN
     INSERT #ReportTopWaits
     SELECT TOP 10
         WaitType,
-        SUM(WaitTimeMs),
-        SUM(ISNULL(DeltaWaitTimeMs,0)),
-        SUM(WaitingTasksCount)
+        SUM(DeltaWaitTimeMs),
+        SUM(DeltaWaitTimeMs),
+        MAX(WaitingTasksCount) - MIN(WaitingTasksCount)
     FROM [monitor].[WaitStatsHistory]
     WHERE CollectedAt >= @StartDate
+      AND DeltaWaitTimeMs IS NOT NULL  -- snapshots are cumulative; only deltas are meaningful
+      AND WaitType NOT IN ('LAZYWRITER_SLEEP', 'DISPATCHER_QUEUE_SEMAPHORE', 'SP_SERVER_DIAGNOSTICS_SLEEP',
+          'REQUEST_FOR_DEADLOCK_SEARCH', 'HADR_FILESTREAM_IOMGR_IOCOMPLETION',
+          'QDS_PERSIST_TASK_MAIN_LOOP_SLEEP', 'QDS_CLEANUP_STALE_QUERIES_TASK_MAIN_LOOP_SLEEP')
     GROUP BY WaitType
-    ORDER BY SUM(ISNULL(DeltaWaitTimeMs,WaitTimeMs)) DESC;
+    ORDER BY SUM(DeltaWaitTimeMs) DESC;
 
     CREATE TABLE #ReportAnomalies (
         MetricName          NVARCHAR(100),

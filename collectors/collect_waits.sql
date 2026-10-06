@@ -28,9 +28,32 @@ BEGIN
         ws.waiting_tasks_count AS WaitingTasksCount,
         ws.wait_time_ms        AS WaitTimeMs,
         ws.signal_wait_time_ms AS SignalWaitTimeMs,
-        NULL                   AS DeltaWaitTimeMs
+        -- Delta vs previous snapshot; NULL on first sample, counter reset (restart/clear) uses current value
+        CASE
+            WHEN prev.WaitTimeMs IS NULL THEN NULL
+            WHEN ws.wait_time_ms >= prev.WaitTimeMs THEN ws.wait_time_ms - prev.WaitTimeMs
+            ELSE ws.wait_time_ms
+        END                    AS DeltaWaitTimeMs
     FROM sys.dm_os_wait_stats ws
+    OUTER APPLY (
+        SELECT TOP (1) h.WaitTimeMs
+        FROM [monitor].[WaitStatsHistory] h
+        WHERE h.WaitType = ws.wait_type
+        ORDER BY h.CollectedAt DESC
+    ) prev
     WHERE ws.wait_type NOT IN (
+        -- Benign / idle waits
+        'LAZYWRITER_SLEEP', 'DISPATCHER_QUEUE_SEMAPHORE', 'SP_SERVER_DIAGNOSTICS_SLEEP',
+        'REQUEST_FOR_DEADLOCK_SEARCH', 'HADR_FILESTREAM_IOMGR_IOCOMPLETION',
+        'QDS_PERSIST_TASK_MAIN_LOOP_SLEEP', 'QDS_CLEANUP_STALE_QUERIES_TASK_MAIN_LOOP_SLEEP',
+        'QDS_ASYNC_QUEUE', 'QDS_SHUTDOWN_QUEUE', 'SLEEP_BPOOL_FLUSH', 'SLEEP_DBSTARTUP',
+        'SLEEP_DCOMSTARTUP', 'SLEEP_MASTERDBREADY', 'SLEEP_MASTERMDREADY',
+        'SLEEP_MASTERUPGRADED', 'SLEEP_MSDBSTARTUP', 'SLEEP_TEMPDBSTARTUP',
+        'HADR_CLUSAPI_CALL', 'HADR_LOGCAPTURE_WAIT', 'HADR_NOTIFICATION_DEQUEUE',
+        'HADR_TIMER_TASK', 'HADR_WORK_QUEUE', 'WAIT_XTP_HOST_WAIT', 'WAIT_XTP_OFFLINE_CKPT_NEW_LOG',
+        'XE_LIVE_TARGET_TVF', 'PVS_PREALLOCATE', 'PARALLEL_REDO_DRAIN_WORKER',
+        'PARALLEL_REDO_LOG_CACHE', 'PARALLEL_REDO_TRAN_LIST', 'PARALLEL_REDO_WORKER_SYNC',
+        'PARALLEL_REDO_WORKER_WAIT_WORK',
         'BROKER_EVENTHANDLER', 'BROKER_RECEIVE_WAITFOR', 'BROKER_TASK_STOP',
         'BROKER_TO_FLUSH', 'BROKER_TRANSMITTER', 'CHECKPOINT_QUEUE',
         'CHKPT', 'CLR_AUTO_EVENT', 'CLR_MANUAL_EVENT', 'CLR_SEMAPHORE',

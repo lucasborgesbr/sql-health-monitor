@@ -214,7 +214,7 @@ UPDATE [monitor].[Thresholds] SET IsEnabled = 0 WHERE MetricName = 'CDC_LatencyS
 | CPU_SystemPct | 90% | 98% | >= |
 | Memory_PLE | 300s | 100s | <= |
 | Memory_GrantsPending | 1 | 5 | >= |
-| Disk_UsedPct | 85% | 95% | >= |
+| Disk_UsedPct | 80% | 90% | >= |
 | Disk_ReadLatencyMs | 20ms | 50ms | >= |
 | Disk_WriteLatencyMs | 20ms | 50ms | >= |
 | AG_SecondsBehind | 30s | 120s | >= |
