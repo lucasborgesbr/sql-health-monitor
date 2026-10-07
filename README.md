@@ -304,19 +304,14 @@ sql-health-monitor/
 │   ├── collect_job_history_linux.sql
 │   ├── install-linux.sh              # Linux deployment helper
 │   ├── run-collector.sh              # Per-collector runner for Linux
-│   ├── validate-installation.sh
-│   ├── ADAPTATION-SUMMARY.md
-│   ├── Linux-Compatibility-Report.md
-│   └── Linux-Implementation-Guide.md
+│   └── validate-installation.sh
+│
+├── tests/                           # Pester test suite for the installer
+│   └── Test-Install.ps1
 │
 ├── views/                           # SQL views for direct querying
 │   ├── vw_CurrentHealth.sql
 │   └── vw_UptimeTracker.sql
-│
-├── config/                           # Static configuration
-│   ├── settings.sql                  # Settings metadata (runtime config lives in [monitor].[Settings])
-│   ├── languages.sql                  # UI strings: en, ptbr
-│   └── default.json                  # Legacy PS-era reference; superseded by Settings table
 │
 ├── grafana/                          # Grafana dashboards
 │   ├── dashboards/
@@ -482,6 +477,16 @@ ORDER BY TotalMB DESC;
 
 ## Multi-Instance Support
 
+`multi-instance/` ships as standalone scripts — `Install.ps1` does **not** deploy them automatically. After the main install, run them against the database:
+
+```powershell
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\cms_tables.sql
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\collect_all_instances.sql
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\compare_instances.sql
+```
+
+Then register the instances to monitor and run cross-instance collection:
+
 ```sql
 -- Register instances
 INSERT INTO [monitor].[RegisteredServers] (ServerName, Environment, Description)
@@ -496,6 +501,34 @@ EXEC [monitor].[usp_CollectAllInstances] @Environment = 'PRD';
 -- Compare health across instances
 EXEC [monitor].[usp_CompareInstances] @Environment = 'PRD';
 ```
+
+## Linux SQL Server
+
+`linux-adaptation/` ships dedicated collectors for SQL Server on Linux, plus shell helpers for environments without SQL Agent. The main `Install.ps1` is Windows-first; on Linux, use the bundled shell scripts:
+
+```bash
+cd sql-health-monitor
+chmod +x linux-adaptation/install-linux.sh
+sudo ./linux-adaptation/install-linux.sh
+./linux-adaptation/run-collector.sh cpu
+./linux-adaptation/validate-installation.sh
+```
+
+The Linux collectors replace the Windows ones for `cpu`, `disk`, `errorlog` and `job_history`, since SQL Server on Linux does not expose `xp_cmdshell`/`WMI`/SQL Agent the same way. Everything else (alerts, reports, baselines) is identical to the Windows install.
+
+## Tests
+
+`tests/Test-Install.ps1` is a Pester suite that exercises the installer against a live SQL Server instance. Use it to validate a new release, or to catch regressions before opening a PR.
+
+```powershell
+# Run against the default LocalDB instance
+.\tests\Test-Install.ps1
+
+# Run against a specific instance
+.\tests\Test-Install.ps1 -ServerInstance 'SQL-PRD-01'
+```
+
+The suite covers the install chain in order, fresh-install and upgrade modes, agent job creation, threshold defaults, and the rollback paths (`-Mode Upgrade` against a missing database, downgrade refusal).
 
 ## Contributing
 
