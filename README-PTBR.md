@@ -295,19 +295,14 @@ sql-health-monitor/
 │   ├── collect_job_history_linux.sql
 │   ├── install-linux.sh              # Helper de deploy no Linux
 │   ├── run-collector.sh              # Executor por coletor no Linux
-│   ├── validate-installation.sh
-│   ├── ADAPTATION-SUMMARY.md
-│   ├── Linux-Compatibility-Report.md
-│   └── Linux-Implementation-Guide.md
+│   └── validate-installation.sh
 │
 ├── views/                           # Views SQL para consulta direta
 │   ├── vw_CurrentHealth.sql
 │   └── vw_UptimeTracker.sql
 │
-├── config/                           # Configuração estática
-│   ├── settings.sql                  # Metadados de config (runtime fica em [monitor].[Settings])
-│   ├── languages.sql                  # Strings de UI: en, ptbr
-│   └── default.json                  # Legado — referência da era PS, substituído pela tabela Settings
+├── tests/                           # Suite Pester para o instalador
+│   └── Test-Install.ps1
 │
 └── validate_installation.sql         # Validação pré-instalação
     validate_uptime_tracker.sql        # Validação pós-instalação do uptime
@@ -392,6 +387,57 @@ EXEC [monitor].[usp_HealthCheck] @DatabaseName = 'Vendas';
 10 checks: backup ausente, espaço crítico, suspect pages, SQL Agent parado,
 auto-close/auto-shrink ligados, estatísticas desatualizadas, fragmentação de
 índices, query de alto CPU, waits acumulados e owner como `sa`.
+
+## Suporte Multi-Instância
+
+`multi-instance/` é distribuído como scripts standalone — `Install.ps1` **não** os deploya automaticamente. Depois do install principal, rode contra o banco:
+
+```powershell
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\cms_tables.sql
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\collect_all_instances.sql
+sqlcmd -S HUB -E -b -d SQLHealthMonitor -i multi-instance\compare_instances.sql
+```
+
+Depois registre as instâncias a monitorar e rode a coleta cross-instance:
+
+```sql
+INSERT INTO [monitor].[RegisteredServers] (ServerName, Environment, Description)
+VALUES
+    ('SQL-PRD-01', 'PRD', 'Produção Primária'),
+    ('SQL-PRD-02', 'PRD', 'Produção Secundária'),
+    ('SQL-STG-01', 'STG', 'Staging');
+
+EXEC [monitor].[usp_CollectAllInstances] @Environment = 'PRD';
+EXEC [monitor].[usp_CompareInstances] @Environment = 'PRD';
+```
+
+## Linux SQL Server
+
+`linux-adaptation/` traz coletores dedicados para SQL Server em Linux, mais shell helpers para ambientes sem SQL Agent. O `Install.ps1` principal é Windows-first; em Linux, use os scripts shell:
+
+```bash
+cd sql-health-monitor
+chmod +x linux-adaptation/install-linux.sh
+sudo ./linux-adaptation/install-linux.sh
+./linux-adaptation/run-collector.sh cpu
+./linux-adaptation/validate-installation.sh
+```
+
+Os coletores Linux substituem os Windows para `cpu`, `disk`, `errorlog` e `job_history`, já que o SQL Server em Linux não expõe `xp_cmdshell`/`WMI`/SQL Agent da mesma forma. Todo o resto (alertas, relatórios, baselines) é idêntico ao install Windows.
+
+## Testes
+
+`tests/Test-Install.ps1` é uma suite Pester que exercita o instalador contra uma instância SQL Server real. Use para validar uma nova release, ou para pegar regressões antes de abrir PR.
+
+```powershell
+# Rodar contra a LocalDB padrão
+.\tests\Test-Install.ps1
+
+# Rodar contra uma instância específica
+.\tests\Test-Install.ps1 -ServerInstance 'SQL-PRD-01'
+```
+
+A suite cobre a cadeia de install em ordem, modos fresh-install e upgrade, criação de jobs do Agent, defaults de threshold e os caminhos de rollback (`-Mode Upgrade` contra banco inexistente, recusa de downgrade).
 
 ## Resolução de Problemas
 
