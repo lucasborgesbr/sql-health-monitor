@@ -13,7 +13,7 @@ O PowerShell é usado **apenas** para deploy (`deploy/Install.ps1` executa os ar
 
 ### Funcionalidades
 
-- **18 Coletores** — CPU, memória, disco, waits, blocking, deadlocks, Availability Groups, CDC, top queries, saúde de índices, status de backups, histórico de jobs, TempDB, crescimento de log, crescimento de banco, error log, crescimento de arquivos, rastreamento de uptime SLA
+- **20 Coletores** — CPU, memória, disco, waits, blocking, deadlocks, Availability Groups, CDC, top queries, saúde de índices, status de backups, histórico de jobs, TempDB, crescimento de log, crescimento de banco, error log, crescimento de arquivos, rastreamento de uptime SLA, recomendações de índice, query store
 - **Engine de Alertas** — thresholds configuráveis com período de cooldown e histórico
 - **Engine de Baseline Estatística** — detecção de anomalias por desvio padrão
 - **Relatórios HTML via Database Mail** — health check diário e análise semanal; HTML construído em procedures T-SQL, enviado via `sp_send_dbmail`

@@ -13,7 +13,7 @@ PowerShell is used **only** for deployment (`deploy/Install.ps1` runs the `.sql`
 
 ### Key Features
 
-- **24+ Health Collectors** including live sessions, Query Store, and index recommendations
+- **20 Health Collectors** including live sessions, Query Store, and index recommendations
 - **Real-Time Visibility** — live session capture with blocking chain detection
 - **Query Store Integration** — multi-dimensional query analysis (CPU, Duration, I/O)
 - **Index Recommendations** — DMV-based suggestions with CREATE INDEX scripts

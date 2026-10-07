@@ -77,7 +77,7 @@ Thresholds are stored in `[monitor].[Thresholds]` and control when alerts fire.
 | `Memory_PLE` | 300 | 100 | <= | Page Life Expectancy (s) |
 | `Memory_GrantsPending` | 1 | 5 | >= | Memory grants pending |
 | `Memory_BufferHitRatio` | 95 | 90 | <= | Buffer cache hit ratio % |
-| `Disk_UsedPct` | 85 | 95 | >= | Disk space used % |
+| `Disk_UsedPct` | 80 | 90 | >= | Disk space used % |
 | `Disk_ReadLatencyMs` | 20 | 50 | >= | Read latency (ms) |
 | `Disk_WriteLatencyMs` | 20 | 50 | >= | Write latency (ms) |
 | `AG_SecondsBehind` | 30 | 120 | >= | Seconds behind primary |

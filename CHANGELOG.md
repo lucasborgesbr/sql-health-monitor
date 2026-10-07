@@ -102,23 +102,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `-SqlAuth -Login sa -Password ...` to force SQL auth even when
   `SQLCMDUSER` happens to be set.
 
-## [1.1.4] - 2026-10-06
+## [1.1.4] - 2026-10-07
 
 ### Fixed
 - `collect_waits` stored `DeltaWaitTimeMs` as NULL, so the daily and weekly
   reports summed cumulative counters and ranked idle waits first. It now stores
   the delta against the previous snapshot (counter resets use the current
   value) and skips more idle waits (`LAZYWRITER_SLEEP`,
-  `DISPATCHER_QUEUE_SEMAPHORE`, `QDS_*`, `HADR_*` ...)
+  `DISPATCHER_QUEUE_SEMAPHORE`, `QDS_*`, `HADR_*`, ...)
 - Daily and weekly top-waits use deltas only
+- `sqlcmd` is now invoked with `-C` (sqlcmd 18+): the flag trusts the server
+  certificate and has no environment-variable equivalent, so the previous
+  installs were silently falling back to `-No` on sqlcmd 18
+- `:r` paths in install scripts use a flat layout. `sqlcmd` resolves them
+  relative to CWD, and a non-flat layout (subfolders) silently produced
+  files that `:r` could not find
 
 ### Changed
 - Disk thresholds are 80% warning / 90% critical everywhere (daily report,
-  recommendations, multi-instance scoring, `Disk_UsedPct` default, READMEs)
+  weekly report, recommendations, multi-instance scoring, `Disk_UsedPct`
+  default, READMEs). Previously 85/95 in some places, 80/90 in others
+- `Install.ps1`, `Test-Install.ps1` and `Uninstall.ps1` fall back to
+  Windows authentication (`-E` to sqlcmd) when neither `-SqlAuth` nor
+  `SQLCMDUSER` are set. The previous "No SQL credentials available" exit
+  is gone — an operator with only domain credentials now reaches the same
+  point that an SQL-auth user would, and gets a sqlcmd login error if
+  the Windows account cannot reach the target instance. Pass
+  `-SqlAuth -Login sa -Password ...` to force SQL auth even when
+  `SQLCMDUSER` happens to be set
 
 ### Migration
-- `V1_1_4__waits-delta-backfill-and-disk-thresholds.sql` backfills the missing
-  deltas and moves `Disk_UsedPct` to 80/90 only if it is still 85/95
+- `V1_1_4__waits-delta-backfill-and-disk-thresholds.sql`:
+  - backfills the missing `DeltaWaitTimeMs` for rows already in
+    `[monitor].[WaitStatsHistory]` so historical top-waits become
+    meaningful after the fix
+  - moves `Disk_UsedPct` from 85/95 to 80/90 only if the row is still at
+    the pre-1.1.4 default. Operator-set values are not touched
+  - applied in version order by `Install.ps1 -Mode Upgrade` and recorded
+    in `[monitor].[AppliedMigrations]`
 
 ## [1.0.0] - 2026-06-02
 
